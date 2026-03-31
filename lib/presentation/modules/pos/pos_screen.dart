@@ -190,7 +190,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           // Module tabs
           _navTab('F1 Ventas', true, () {}, icon: LucideIcons.receipt, iconColor: const Color(0xFF059669)),
           _navTab('F2 Clientes', false, _showCustomerLookup, icon: LucideIcons.users, iconColor: const Color(0xFFE67E22)),
-          _navTab('F3 Productos', false, _showSearchDialog, icon: LucideIcons.box, iconColor: const Color(0xFF2563EB)),
+          _navTab('F3 Productos', false, () => context.go('/products'), icon: LucideIcons.box, iconColor: const Color(0xFF2563EB)),
           _navTab('F4 Inventario', false, () => context.go('/inventory'), icon: LucideIcons.clipboardList, iconColor: const Color(0xFF7C3AED)),
           _popupMenu('Configuración', [
             _popItem(LucideIcons.userCircle2, 'Seleccionar vendedor', _showSellerSelect),
@@ -1606,8 +1606,13 @@ class _PosScreenState extends ConsumerState<PosScreen> {
             costPrice: 0,
             salePrice: price,
             wholesalePrice: null,
+            price2: null,
+            price3: null,
             taxRate: 15.0,
             isTaxExempt: false,
+            unitsPerBox: 1,
+            costPerBox: 0,
+            allowFractions: false,
             currentStock: 9999,
             minStock: 0,
             maxStock: null,

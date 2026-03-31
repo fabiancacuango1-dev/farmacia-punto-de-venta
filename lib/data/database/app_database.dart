@@ -144,7 +144,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -184,6 +184,14 @@ class AppDatabase extends _$AppDatabase {
           // Add location tracking columns
           await m.addColumn(products, products.location);
           await m.addColumn(products, products.shelf);
+        }
+        if (from < 7) {
+          // Add multi-price tiers and fractional selling columns
+          await m.addColumn(products, products.price2);
+          await m.addColumn(products, products.price3);
+          await m.addColumn(products, products.unitsPerBox);
+          await m.addColumn(products, products.costPerBox);
+          await m.addColumn(products, products.allowFractions);
         }
       },
     );

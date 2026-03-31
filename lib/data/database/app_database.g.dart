@@ -1139,6 +1139,16 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
   late final GeneratedColumn<double> wholesalePrice = GeneratedColumn<double>(
       'wholesale_price', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _price2Meta = const VerificationMeta('price2');
+  @override
+  late final GeneratedColumn<double> price2 = GeneratedColumn<double>(
+      'price2', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _price3Meta = const VerificationMeta('price3');
+  @override
+  late final GeneratedColumn<double> price3 = GeneratedColumn<double>(
+      'price3', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   static const VerificationMeta _taxRateMeta =
       const VerificationMeta('taxRate');
   @override
@@ -1156,6 +1166,32 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
       requiredDuringInsert: false,
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("is_tax_exempt" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _unitsPerBoxMeta =
+      const VerificationMeta('unitsPerBox');
+  @override
+  late final GeneratedColumn<int> unitsPerBox = GeneratedColumn<int>(
+      'units_per_box', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(1));
+  static const VerificationMeta _costPerBoxMeta =
+      const VerificationMeta('costPerBox');
+  @override
+  late final GeneratedColumn<double> costPerBox = GeneratedColumn<double>(
+      'cost_per_box', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _allowFractionsMeta =
+      const VerificationMeta('allowFractions');
+  @override
+  late final GeneratedColumn<bool> allowFractions = GeneratedColumn<bool>(
+      'allow_fractions', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("allow_fractions" IN (0, 1))'),
       defaultValue: const Constant(false));
   static const VerificationMeta _currentStockMeta =
       const VerificationMeta('currentStock');
@@ -1320,8 +1356,13 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         costPrice,
         salePrice,
         wholesalePrice,
+        price2,
+        price3,
         taxRate,
         isTaxExempt,
+        unitsPerBox,
+        costPerBox,
+        allowFractions,
         currentStock,
         minStock,
         maxStock,
@@ -1424,6 +1465,14 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
           wholesalePrice.isAcceptableOrUnknown(
               data['wholesale_price']!, _wholesalePriceMeta));
     }
+    if (data.containsKey('price2')) {
+      context.handle(_price2Meta,
+          price2.isAcceptableOrUnknown(data['price2']!, _price2Meta));
+    }
+    if (data.containsKey('price3')) {
+      context.handle(_price3Meta,
+          price3.isAcceptableOrUnknown(data['price3']!, _price3Meta));
+    }
     if (data.containsKey('tax_rate')) {
       context.handle(_taxRateMeta,
           taxRate.isAcceptableOrUnknown(data['tax_rate']!, _taxRateMeta));
@@ -1433,6 +1482,24 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
           _isTaxExemptMeta,
           isTaxExempt.isAcceptableOrUnknown(
               data['is_tax_exempt']!, _isTaxExemptMeta));
+    }
+    if (data.containsKey('units_per_box')) {
+      context.handle(
+          _unitsPerBoxMeta,
+          unitsPerBox.isAcceptableOrUnknown(
+              data['units_per_box']!, _unitsPerBoxMeta));
+    }
+    if (data.containsKey('cost_per_box')) {
+      context.handle(
+          _costPerBoxMeta,
+          costPerBox.isAcceptableOrUnknown(
+              data['cost_per_box']!, _costPerBoxMeta));
+    }
+    if (data.containsKey('allow_fractions')) {
+      context.handle(
+          _allowFractionsMeta,
+          allowFractions.isAcceptableOrUnknown(
+              data['allow_fractions']!, _allowFractionsMeta));
     }
     if (data.containsKey('current_stock')) {
       context.handle(
@@ -1569,10 +1636,20 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
           .read(DriftSqlType.double, data['${effectivePrefix}sale_price'])!,
       wholesalePrice: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}wholesale_price']),
+      price2: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}price2']),
+      price3: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}price3']),
       taxRate: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}tax_rate'])!,
       isTaxExempt: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_tax_exempt'])!,
+      unitsPerBox: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}units_per_box'])!,
+      costPerBox: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}cost_per_box'])!,
+      allowFractions: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}allow_fractions'])!,
       currentStock: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}current_stock'])!,
       minStock: attachedDatabase.typeMapping
@@ -1636,8 +1713,13 @@ class Product extends DataClass implements Insertable<Product> {
   final double costPrice;
   final double salePrice;
   final double? wholesalePrice;
+  final double? price2;
+  final double? price3;
   final double taxRate;
   final bool isTaxExempt;
+  final int unitsPerBox;
+  final double costPerBox;
+  final bool allowFractions;
   final double currentStock;
   final double minStock;
   final double? maxStock;
@@ -1672,8 +1754,13 @@ class Product extends DataClass implements Insertable<Product> {
       required this.costPrice,
       required this.salePrice,
       this.wholesalePrice,
+      this.price2,
+      this.price3,
       required this.taxRate,
       required this.isTaxExempt,
+      required this.unitsPerBox,
+      required this.costPerBox,
+      required this.allowFractions,
       required this.currentStock,
       required this.minStock,
       this.maxStock,
@@ -1728,8 +1815,17 @@ class Product extends DataClass implements Insertable<Product> {
     if (!nullToAbsent || wholesalePrice != null) {
       map['wholesale_price'] = Variable<double>(wholesalePrice);
     }
+    if (!nullToAbsent || price2 != null) {
+      map['price2'] = Variable<double>(price2);
+    }
+    if (!nullToAbsent || price3 != null) {
+      map['price3'] = Variable<double>(price3);
+    }
     map['tax_rate'] = Variable<double>(taxRate);
     map['is_tax_exempt'] = Variable<bool>(isTaxExempt);
+    map['units_per_box'] = Variable<int>(unitsPerBox);
+    map['cost_per_box'] = Variable<double>(costPerBox);
+    map['allow_fractions'] = Variable<bool>(allowFractions);
     map['current_stock'] = Variable<double>(currentStock);
     map['min_stock'] = Variable<double>(minStock);
     if (!nullToAbsent || maxStock != null) {
@@ -1804,8 +1900,15 @@ class Product extends DataClass implements Insertable<Product> {
       wholesalePrice: wholesalePrice == null && nullToAbsent
           ? const Value.absent()
           : Value(wholesalePrice),
+      price2:
+          price2 == null && nullToAbsent ? const Value.absent() : Value(price2),
+      price3:
+          price3 == null && nullToAbsent ? const Value.absent() : Value(price3),
       taxRate: Value(taxRate),
       isTaxExempt: Value(isTaxExempt),
+      unitsPerBox: Value(unitsPerBox),
+      costPerBox: Value(costPerBox),
+      allowFractions: Value(allowFractions),
       currentStock: Value(currentStock),
       minStock: Value(minStock),
       maxStock: maxStock == null && nullToAbsent
@@ -1863,8 +1966,13 @@ class Product extends DataClass implements Insertable<Product> {
       costPrice: serializer.fromJson<double>(json['costPrice']),
       salePrice: serializer.fromJson<double>(json['salePrice']),
       wholesalePrice: serializer.fromJson<double?>(json['wholesalePrice']),
+      price2: serializer.fromJson<double?>(json['price2']),
+      price3: serializer.fromJson<double?>(json['price3']),
       taxRate: serializer.fromJson<double>(json['taxRate']),
       isTaxExempt: serializer.fromJson<bool>(json['isTaxExempt']),
+      unitsPerBox: serializer.fromJson<int>(json['unitsPerBox']),
+      costPerBox: serializer.fromJson<double>(json['costPerBox']),
+      allowFractions: serializer.fromJson<bool>(json['allowFractions']),
       currentStock: serializer.fromJson<double>(json['currentStock']),
       minStock: serializer.fromJson<double>(json['minStock']),
       maxStock: serializer.fromJson<double?>(json['maxStock']),
@@ -1906,8 +2014,13 @@ class Product extends DataClass implements Insertable<Product> {
       'costPrice': serializer.toJson<double>(costPrice),
       'salePrice': serializer.toJson<double>(salePrice),
       'wholesalePrice': serializer.toJson<double?>(wholesalePrice),
+      'price2': serializer.toJson<double?>(price2),
+      'price3': serializer.toJson<double?>(price3),
       'taxRate': serializer.toJson<double>(taxRate),
       'isTaxExempt': serializer.toJson<bool>(isTaxExempt),
+      'unitsPerBox': serializer.toJson<int>(unitsPerBox),
+      'costPerBox': serializer.toJson<double>(costPerBox),
+      'allowFractions': serializer.toJson<bool>(allowFractions),
       'currentStock': serializer.toJson<double>(currentStock),
       'minStock': serializer.toJson<double>(minStock),
       'maxStock': serializer.toJson<double?>(maxStock),
@@ -1945,8 +2058,13 @@ class Product extends DataClass implements Insertable<Product> {
           double? costPrice,
           double? salePrice,
           Value<double?> wholesalePrice = const Value.absent(),
+          Value<double?> price2 = const Value.absent(),
+          Value<double?> price3 = const Value.absent(),
           double? taxRate,
           bool? isTaxExempt,
+          int? unitsPerBox,
+          double? costPerBox,
+          bool? allowFractions,
           double? currentStock,
           double? minStock,
           Value<double?> maxStock = const Value.absent(),
@@ -1985,8 +2103,13 @@ class Product extends DataClass implements Insertable<Product> {
         salePrice: salePrice ?? this.salePrice,
         wholesalePrice:
             wholesalePrice.present ? wholesalePrice.value : this.wholesalePrice,
+        price2: price2.present ? price2.value : this.price2,
+        price3: price3.present ? price3.value : this.price3,
         taxRate: taxRate ?? this.taxRate,
         isTaxExempt: isTaxExempt ?? this.isTaxExempt,
+        unitsPerBox: unitsPerBox ?? this.unitsPerBox,
+        costPerBox: costPerBox ?? this.costPerBox,
+        allowFractions: allowFractions ?? this.allowFractions,
         currentStock: currentStock ?? this.currentStock,
         minStock: minStock ?? this.minStock,
         maxStock: maxStock.present ? maxStock.value : this.maxStock,
@@ -2040,9 +2163,18 @@ class Product extends DataClass implements Insertable<Product> {
       wholesalePrice: data.wholesalePrice.present
           ? data.wholesalePrice.value
           : this.wholesalePrice,
+      price2: data.price2.present ? data.price2.value : this.price2,
+      price3: data.price3.present ? data.price3.value : this.price3,
       taxRate: data.taxRate.present ? data.taxRate.value : this.taxRate,
       isTaxExempt:
           data.isTaxExempt.present ? data.isTaxExempt.value : this.isTaxExempt,
+      unitsPerBox:
+          data.unitsPerBox.present ? data.unitsPerBox.value : this.unitsPerBox,
+      costPerBox:
+          data.costPerBox.present ? data.costPerBox.value : this.costPerBox,
+      allowFractions: data.allowFractions.present
+          ? data.allowFractions.value
+          : this.allowFractions,
       currentStock: data.currentStock.present
           ? data.currentStock.value
           : this.currentStock,
@@ -2099,8 +2231,13 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('costPrice: $costPrice, ')
           ..write('salePrice: $salePrice, ')
           ..write('wholesalePrice: $wholesalePrice, ')
+          ..write('price2: $price2, ')
+          ..write('price3: $price3, ')
           ..write('taxRate: $taxRate, ')
           ..write('isTaxExempt: $isTaxExempt, ')
+          ..write('unitsPerBox: $unitsPerBox, ')
+          ..write('costPerBox: $costPerBox, ')
+          ..write('allowFractions: $allowFractions, ')
           ..write('currentStock: $currentStock, ')
           ..write('minStock: $minStock, ')
           ..write('maxStock: $maxStock, ')
@@ -2140,8 +2277,13 @@ class Product extends DataClass implements Insertable<Product> {
         costPrice,
         salePrice,
         wholesalePrice,
+        price2,
+        price3,
         taxRate,
         isTaxExempt,
+        unitsPerBox,
+        costPerBox,
+        allowFractions,
         currentStock,
         minStock,
         maxStock,
@@ -2180,8 +2322,13 @@ class Product extends DataClass implements Insertable<Product> {
           other.costPrice == this.costPrice &&
           other.salePrice == this.salePrice &&
           other.wholesalePrice == this.wholesalePrice &&
+          other.price2 == this.price2 &&
+          other.price3 == this.price3 &&
           other.taxRate == this.taxRate &&
           other.isTaxExempt == this.isTaxExempt &&
+          other.unitsPerBox == this.unitsPerBox &&
+          other.costPerBox == this.costPerBox &&
+          other.allowFractions == this.allowFractions &&
           other.currentStock == this.currentStock &&
           other.minStock == this.minStock &&
           other.maxStock == this.maxStock &&
@@ -2218,8 +2365,13 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<double> costPrice;
   final Value<double> salePrice;
   final Value<double?> wholesalePrice;
+  final Value<double?> price2;
+  final Value<double?> price3;
   final Value<double> taxRate;
   final Value<bool> isTaxExempt;
+  final Value<int> unitsPerBox;
+  final Value<double> costPerBox;
+  final Value<bool> allowFractions;
   final Value<double> currentStock;
   final Value<double> minStock;
   final Value<double?> maxStock;
@@ -2255,8 +2407,13 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.costPrice = const Value.absent(),
     this.salePrice = const Value.absent(),
     this.wholesalePrice = const Value.absent(),
+    this.price2 = const Value.absent(),
+    this.price3 = const Value.absent(),
     this.taxRate = const Value.absent(),
     this.isTaxExempt = const Value.absent(),
+    this.unitsPerBox = const Value.absent(),
+    this.costPerBox = const Value.absent(),
+    this.allowFractions = const Value.absent(),
     this.currentStock = const Value.absent(),
     this.minStock = const Value.absent(),
     this.maxStock = const Value.absent(),
@@ -2293,8 +2450,13 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.costPrice = const Value.absent(),
     this.salePrice = const Value.absent(),
     this.wholesalePrice = const Value.absent(),
+    this.price2 = const Value.absent(),
+    this.price3 = const Value.absent(),
     this.taxRate = const Value.absent(),
     this.isTaxExempt = const Value.absent(),
+    this.unitsPerBox = const Value.absent(),
+    this.costPerBox = const Value.absent(),
+    this.allowFractions = const Value.absent(),
     this.currentStock = const Value.absent(),
     this.minStock = const Value.absent(),
     this.maxStock = const Value.absent(),
@@ -2332,8 +2494,13 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<double>? costPrice,
     Expression<double>? salePrice,
     Expression<double>? wholesalePrice,
+    Expression<double>? price2,
+    Expression<double>? price3,
     Expression<double>? taxRate,
     Expression<bool>? isTaxExempt,
+    Expression<int>? unitsPerBox,
+    Expression<double>? costPerBox,
+    Expression<bool>? allowFractions,
     Expression<double>? currentStock,
     Expression<double>? minStock,
     Expression<double>? maxStock,
@@ -2370,8 +2537,13 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (costPrice != null) 'cost_price': costPrice,
       if (salePrice != null) 'sale_price': salePrice,
       if (wholesalePrice != null) 'wholesale_price': wholesalePrice,
+      if (price2 != null) 'price2': price2,
+      if (price3 != null) 'price3': price3,
       if (taxRate != null) 'tax_rate': taxRate,
       if (isTaxExempt != null) 'is_tax_exempt': isTaxExempt,
+      if (unitsPerBox != null) 'units_per_box': unitsPerBox,
+      if (costPerBox != null) 'cost_per_box': costPerBox,
+      if (allowFractions != null) 'allow_fractions': allowFractions,
       if (currentStock != null) 'current_stock': currentStock,
       if (minStock != null) 'min_stock': minStock,
       if (maxStock != null) 'max_stock': maxStock,
@@ -2411,8 +2583,13 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       Value<double>? costPrice,
       Value<double>? salePrice,
       Value<double?>? wholesalePrice,
+      Value<double?>? price2,
+      Value<double?>? price3,
       Value<double>? taxRate,
       Value<bool>? isTaxExempt,
+      Value<int>? unitsPerBox,
+      Value<double>? costPerBox,
+      Value<bool>? allowFractions,
       Value<double>? currentStock,
       Value<double>? minStock,
       Value<double?>? maxStock,
@@ -2448,8 +2625,13 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       costPrice: costPrice ?? this.costPrice,
       salePrice: salePrice ?? this.salePrice,
       wholesalePrice: wholesalePrice ?? this.wholesalePrice,
+      price2: price2 ?? this.price2,
+      price3: price3 ?? this.price3,
       taxRate: taxRate ?? this.taxRate,
       isTaxExempt: isTaxExempt ?? this.isTaxExempt,
+      unitsPerBox: unitsPerBox ?? this.unitsPerBox,
+      costPerBox: costPerBox ?? this.costPerBox,
+      allowFractions: allowFractions ?? this.allowFractions,
       currentStock: currentStock ?? this.currentStock,
       minStock: minStock ?? this.minStock,
       maxStock: maxStock ?? this.maxStock,
@@ -2516,11 +2698,26 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     if (wholesalePrice.present) {
       map['wholesale_price'] = Variable<double>(wholesalePrice.value);
     }
+    if (price2.present) {
+      map['price2'] = Variable<double>(price2.value);
+    }
+    if (price3.present) {
+      map['price3'] = Variable<double>(price3.value);
+    }
     if (taxRate.present) {
       map['tax_rate'] = Variable<double>(taxRate.value);
     }
     if (isTaxExempt.present) {
       map['is_tax_exempt'] = Variable<bool>(isTaxExempt.value);
+    }
+    if (unitsPerBox.present) {
+      map['units_per_box'] = Variable<int>(unitsPerBox.value);
+    }
+    if (costPerBox.present) {
+      map['cost_per_box'] = Variable<double>(costPerBox.value);
+    }
+    if (allowFractions.present) {
+      map['allow_fractions'] = Variable<bool>(allowFractions.value);
     }
     if (currentStock.present) {
       map['current_stock'] = Variable<double>(currentStock.value);
@@ -2604,8 +2801,13 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('costPrice: $costPrice, ')
           ..write('salePrice: $salePrice, ')
           ..write('wholesalePrice: $wholesalePrice, ')
+          ..write('price2: $price2, ')
+          ..write('price3: $price3, ')
           ..write('taxRate: $taxRate, ')
           ..write('isTaxExempt: $isTaxExempt, ')
+          ..write('unitsPerBox: $unitsPerBox, ')
+          ..write('costPerBox: $costPerBox, ')
+          ..write('allowFractions: $allowFractions, ')
           ..write('currentStock: $currentStock, ')
           ..write('minStock: $minStock, ')
           ..write('maxStock: $maxStock, ')
@@ -27833,8 +28035,13 @@ typedef $$ProductsTableCreateCompanionBuilder = ProductsCompanion Function({
   Value<double> costPrice,
   Value<double> salePrice,
   Value<double?> wholesalePrice,
+  Value<double?> price2,
+  Value<double?> price3,
   Value<double> taxRate,
   Value<bool> isTaxExempt,
+  Value<int> unitsPerBox,
+  Value<double> costPerBox,
+  Value<bool> allowFractions,
   Value<double> currentStock,
   Value<double> minStock,
   Value<double?> maxStock,
@@ -27871,8 +28078,13 @@ typedef $$ProductsTableUpdateCompanionBuilder = ProductsCompanion Function({
   Value<double> costPrice,
   Value<double> salePrice,
   Value<double?> wholesalePrice,
+  Value<double?> price2,
+  Value<double?> price3,
   Value<double> taxRate,
   Value<bool> isTaxExempt,
+  Value<int> unitsPerBox,
+  Value<double> costPerBox,
+  Value<bool> allowFractions,
   Value<double> currentStock,
   Value<double> minStock,
   Value<double?> maxStock,
@@ -28108,11 +28320,27 @@ class $$ProductsTableFilterComposer
       column: $table.wholesalePrice,
       builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<double> get price2 => $composableBuilder(
+      column: $table.price2, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get price3 => $composableBuilder(
+      column: $table.price3, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<double> get taxRate => $composableBuilder(
       column: $table.taxRate, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get isTaxExempt => $composableBuilder(
       column: $table.isTaxExempt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get unitsPerBox => $composableBuilder(
+      column: $table.unitsPerBox, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get costPerBox => $composableBuilder(
+      column: $table.costPerBox, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get allowFractions => $composableBuilder(
+      column: $table.allowFractions,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<double> get currentStock => $composableBuilder(
       column: $table.currentStock, builder: (column) => ColumnFilters(column));
@@ -28438,11 +28666,27 @@ class $$ProductsTableOrderingComposer
       column: $table.wholesalePrice,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get price2 => $composableBuilder(
+      column: $table.price2, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get price3 => $composableBuilder(
+      column: $table.price3, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<double> get taxRate => $composableBuilder(
       column: $table.taxRate, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<bool> get isTaxExempt => $composableBuilder(
       column: $table.isTaxExempt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get unitsPerBox => $composableBuilder(
+      column: $table.unitsPerBox, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get costPerBox => $composableBuilder(
+      column: $table.costPerBox, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get allowFractions => $composableBuilder(
+      column: $table.allowFractions,
+      builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<double> get currentStock => $composableBuilder(
       column: $table.currentStock,
@@ -28577,11 +28821,26 @@ class $$ProductsTableAnnotationComposer
   GeneratedColumn<double> get wholesalePrice => $composableBuilder(
       column: $table.wholesalePrice, builder: (column) => column);
 
+  GeneratedColumn<double> get price2 =>
+      $composableBuilder(column: $table.price2, builder: (column) => column);
+
+  GeneratedColumn<double> get price3 =>
+      $composableBuilder(column: $table.price3, builder: (column) => column);
+
   GeneratedColumn<double> get taxRate =>
       $composableBuilder(column: $table.taxRate, builder: (column) => column);
 
   GeneratedColumn<bool> get isTaxExempt => $composableBuilder(
       column: $table.isTaxExempt, builder: (column) => column);
+
+  GeneratedColumn<int> get unitsPerBox => $composableBuilder(
+      column: $table.unitsPerBox, builder: (column) => column);
+
+  GeneratedColumn<double> get costPerBox => $composableBuilder(
+      column: $table.costPerBox, builder: (column) => column);
+
+  GeneratedColumn<bool> get allowFractions => $composableBuilder(
+      column: $table.allowFractions, builder: (column) => column);
 
   GeneratedColumn<double> get currentStock => $composableBuilder(
       column: $table.currentStock, builder: (column) => column);
@@ -28905,8 +29164,13 @@ class $$ProductsTableTableManager extends RootTableManager<
             Value<double> costPrice = const Value.absent(),
             Value<double> salePrice = const Value.absent(),
             Value<double?> wholesalePrice = const Value.absent(),
+            Value<double?> price2 = const Value.absent(),
+            Value<double?> price3 = const Value.absent(),
             Value<double> taxRate = const Value.absent(),
             Value<bool> isTaxExempt = const Value.absent(),
+            Value<int> unitsPerBox = const Value.absent(),
+            Value<double> costPerBox = const Value.absent(),
+            Value<bool> allowFractions = const Value.absent(),
             Value<double> currentStock = const Value.absent(),
             Value<double> minStock = const Value.absent(),
             Value<double?> maxStock = const Value.absent(),
@@ -28943,8 +29207,13 @@ class $$ProductsTableTableManager extends RootTableManager<
             costPrice: costPrice,
             salePrice: salePrice,
             wholesalePrice: wholesalePrice,
+            price2: price2,
+            price3: price3,
             taxRate: taxRate,
             isTaxExempt: isTaxExempt,
+            unitsPerBox: unitsPerBox,
+            costPerBox: costPerBox,
+            allowFractions: allowFractions,
             currentStock: currentStock,
             minStock: minStock,
             maxStock: maxStock,
@@ -28981,8 +29250,13 @@ class $$ProductsTableTableManager extends RootTableManager<
             Value<double> costPrice = const Value.absent(),
             Value<double> salePrice = const Value.absent(),
             Value<double?> wholesalePrice = const Value.absent(),
+            Value<double?> price2 = const Value.absent(),
+            Value<double?> price3 = const Value.absent(),
             Value<double> taxRate = const Value.absent(),
             Value<bool> isTaxExempt = const Value.absent(),
+            Value<int> unitsPerBox = const Value.absent(),
+            Value<double> costPerBox = const Value.absent(),
+            Value<bool> allowFractions = const Value.absent(),
             Value<double> currentStock = const Value.absent(),
             Value<double> minStock = const Value.absent(),
             Value<double?> maxStock = const Value.absent(),
@@ -29019,8 +29293,13 @@ class $$ProductsTableTableManager extends RootTableManager<
             costPrice: costPrice,
             salePrice: salePrice,
             wholesalePrice: wholesalePrice,
+            price2: price2,
+            price3: price3,
             taxRate: taxRate,
             isTaxExempt: isTaxExempt,
+            unitsPerBox: unitsPerBox,
+            costPerBox: costPerBox,
+            allowFractions: allowFractions,
             currentStock: currentStock,
             minStock: minStock,
             maxStock: maxStock,

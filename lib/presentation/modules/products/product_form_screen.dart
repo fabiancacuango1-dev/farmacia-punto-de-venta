@@ -76,6 +76,13 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
   final _marginCtrl = TextEditingController(text: '30.00');
   final _salePriceCtrl = TextEditingController(text: '0.00');
   final _wholesalePriceCtrl = TextEditingController();
+  final _price2Ctrl = TextEditingController();
+  final _price3Ctrl = TextEditingController();
+  final _margin2Ctrl = TextEditingController();
+  final _margin3Ctrl = TextEditingController();
+  final _marginWholesaleCtrl = TextEditingController();
+  final _costPerBoxCtrl = TextEditingController(text: '0.00');
+  final _unitsPerBoxCtrl = TextEditingController(text: '1');
 
   // ── Pharmacy ──
   final _concentrationCtrl = TextEditingController();
@@ -106,6 +113,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
   bool _isControlled = false;
   bool _isTaxExempt = false;
   bool _usesInventory = true;
+  bool _allowFractions = false;
   bool _isLoading = false;
   DateTime? _batchExpiry;
 
@@ -120,6 +128,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
     // Auto-calculate sale price when cost or margin changes
     _costPriceCtrl.addListener(_calculateSalePrice);
     _marginCtrl.addListener(_calculateSalePrice);
+    _costPerBoxCtrl.addListener(_calculateFromBox);
+    _unitsPerBoxCtrl.addListener(_calculateFromBox);
+    _margin2Ctrl.addListener(_calculatePrice2);
+    _margin3Ctrl.addListener(_calculatePrice3);
+    _marginWholesaleCtrl.addListener(_calculateWholesalePrice);
   }
 
   void _calculateSalePrice() {
@@ -128,6 +141,42 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
     if (cost > 0) {
       final sale = cost * (1 + margin / 100);
       _salePriceCtrl.text = sale.toStringAsFixed(2);
+    }
+  }
+
+  void _calculateFromBox() {
+    final costBox = double.tryParse(_costPerBoxCtrl.text) ?? 0;
+    final units = int.tryParse(_unitsPerBoxCtrl.text) ?? 1;
+    if (costBox > 0 && units > 0) {
+      final costUnit = costBox / units;
+      _costPriceCtrl.removeListener(_calculateSalePrice);
+      _costPriceCtrl.text = costUnit.toStringAsFixed(2);
+      _costPriceCtrl.addListener(_calculateSalePrice);
+      _calculateSalePrice();
+    }
+  }
+
+  void _calculatePrice2() {
+    final cost = double.tryParse(_costPriceCtrl.text) ?? 0;
+    final margin = double.tryParse(_margin2Ctrl.text) ?? 0;
+    if (cost > 0 && margin > 0) {
+      _price2Ctrl.text = (cost * (1 + margin / 100)).toStringAsFixed(2);
+    }
+  }
+
+  void _calculatePrice3() {
+    final cost = double.tryParse(_costPriceCtrl.text) ?? 0;
+    final margin = double.tryParse(_margin3Ctrl.text) ?? 0;
+    if (cost > 0 && margin > 0) {
+      _price3Ctrl.text = (cost * (1 + margin / 100)).toStringAsFixed(2);
+    }
+  }
+
+  void _calculateWholesalePrice() {
+    final cost = double.tryParse(_costPriceCtrl.text) ?? 0;
+    final margin = double.tryParse(_marginWholesaleCtrl.text) ?? 0;
+    if (cost > 0 && margin > 0) {
+      _wholesalePriceCtrl.text = (cost * (1 + margin / 100)).toStringAsFixed(2);
     }
   }
 
@@ -145,6 +194,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
     _costPriceCtrl.text = product.costPrice.toStringAsFixed(2);
     _salePriceCtrl.text = product.salePrice.toStringAsFixed(2);
     _wholesalePriceCtrl.text = product.wholesalePrice?.toStringAsFixed(2) ?? '';
+    _price2Ctrl.text = product.price2?.toStringAsFixed(2) ?? '';
+    _price3Ctrl.text = product.price3?.toStringAsFixed(2) ?? '';
+    _unitsPerBoxCtrl.text = product.unitsPerBox.toString();
+    _costPerBoxCtrl.text = product.costPerBox.toStringAsFixed(2);
+    _allowFractions = product.allowFractions;
     _concentrationCtrl.text = product.concentration ?? '';
     _minStockCtrl.text = product.minStock.toStringAsFixed(0);
     _maxStockCtrl.text = product.maxStock?.toStringAsFixed(0) ?? '100';
@@ -164,11 +218,24 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
     _locationCtrl.text = product.location ?? '';
     _shelfCtrl.text = product.shelf ?? '';
 
-    // Calculate margin from cost/sale
+    // Calculate margins from cost and prices
     if (product.costPrice > 0) {
       final margin =
           ((product.salePrice - product.costPrice) / product.costPrice) * 100;
       _marginCtrl.text = margin.toStringAsFixed(2);
+
+      if (product.wholesalePrice != null && product.wholesalePrice! > 0) {
+        final mW = ((product.wholesalePrice! - product.costPrice) / product.costPrice) * 100;
+        _marginWholesaleCtrl.text = mW.toStringAsFixed(2);
+      }
+      if (product.price2 != null && product.price2! > 0) {
+        final m2 = ((product.price2! - product.costPrice) / product.costPrice) * 100;
+        _margin2Ctrl.text = m2.toStringAsFixed(2);
+      }
+      if (product.price3 != null && product.price3! > 0) {
+        final m3 = ((product.price3! - product.costPrice) / product.costPrice) * 100;
+        _margin3Ctrl.text = m3.toStringAsFixed(2);
+      }
     }
 
     setState(() {});
@@ -187,6 +254,13 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
     _marginCtrl.dispose();
     _salePriceCtrl.dispose();
     _wholesalePriceCtrl.dispose();
+    _price2Ctrl.dispose();
+    _price3Ctrl.dispose();
+    _margin2Ctrl.dispose();
+    _margin3Ctrl.dispose();
+    _marginWholesaleCtrl.dispose();
+    _costPerBoxCtrl.dispose();
+    _unitsPerBoxCtrl.dispose();
     _concentrationCtrl.dispose();
     _registroSanitarioCtrl.dispose();
     _storageNotesCtrl.dispose();
@@ -215,9 +289,16 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
 
             // ── Tab Bar ──
             Container(
-              color: AppColors.surfaceLight,
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: TabBar(
                 controller: _tabController,
+                labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                unselectedLabelStyle: GoogleFonts.inter(fontSize: 13),
+                labelColor: AppColors.primary,
+                unselectedLabelColor: const Color(0xFF94A3B8),
+                indicatorColor: AppColors.primary,
+                indicatorWeight: 3,
                 tabs: const [
                   Tab(
                     icon: Icon(LucideIcons.package, size: 16),
@@ -238,7 +319,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
                 ],
               ),
             ),
-            const Divider(height: 1),
+            const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
             // ── Tab Content ──
             Expanded(
@@ -266,47 +347,81 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
   // ══════════════════════════════════════════════════════════════
   Widget _buildHeader() {
     return Container(
-      height: 52,
-      decoration: const BoxDecoration(gradient: AppGradients.golden),
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E3A5F), Color(0xFF2563EB), Color(0xFF3B82F6)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
-            onPressed: () => context.go('/products'),
-            tooltip: 'Volver',
+          Material(
+            color: Colors.white.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => context.go('/products'),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(LucideIcons.arrowLeft, color: Colors.white, size: 18),
+              ),
+            ),
           ),
-          const SizedBox(width: 8),
-          Icon(
-            _isEditing ? LucideIcons.pencil : LucideIcons.plusCircle,
-            color: Colors.white,
-            size: 20,
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              _isEditing ? LucideIcons.pencil : LucideIcons.plusCircle,
+              color: Colors.white,
+              size: 18,
+            ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Text(
             _isEditing ? 'EDITAR PRODUCTO' : 'NUEVO PRODUCTO',
             style: GoogleFonts.poppins(
-              fontSize: 17,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
               color: Colors.white,
-              letterSpacing: 1.5,
+              letterSpacing: 1.2,
             ),
           ),
           const Spacer(),
           if (_isEditing)
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
               ),
-              child: Text(
-                'ID: ${widget.productId!.substring(0, 8)}',
-                style: GoogleFonts.jetBrainsMono(
-                  fontSize: 12,
-                  color: Colors.white,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(LucideIcons.fingerprint, color: Colors.white70, size: 13),
+                  const SizedBox(width: 6),
+                  Text(
+                    'ID: ${widget.productId!.substring(0, 8)}',
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 11,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
@@ -383,16 +498,15 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
                           final cats = snap.data ?? [];
                           return DropdownButtonFormField<String>(
                             value: _selectedCategoryId,
-                            decoration: InputDecoration(
-                              labelText: 'Categoría / Departamento',
-                              prefixIcon: const Icon(LucideIcons.folderOpen,
-                                  size: 18),
-                              labelStyle: GoogleFonts.inter(fontSize: 14),
+                            decoration: _dropdownDecoration(
+                              'Categoría / Departamento',
+                              LucideIcons.folderOpen,
                             ),
                             isExpanded: true,
                             style: GoogleFonts.inter(
                                 fontSize: 14,
-                                color: AppColors.textPrimaryLight),
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF1E293B)),
                             items: [
                               const DropdownMenuItem(
                                   value: null,
@@ -484,14 +598,13 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _unit,
-                  decoration: InputDecoration(
-                    labelText: 'Unidad de Medida',
-                    prefixIcon: const Icon(LucideIcons.ruler, size: 18),
-                    labelStyle: GoogleFonts.inter(fontSize: 14),
+                  decoration: _dropdownDecoration(
+                    'Unidad de Medida',
+                    LucideIcons.ruler,
                   ),
                   isExpanded: true,
                   style: GoogleFonts.inter(
-                      fontSize: 14, color: AppColors.textPrimaryLight),
+                      fontSize: 14, fontWeight: FontWeight.w500, color: const Color(0xFF1E293B)),
                   items: _units
                       .map((u) => DropdownMenuItem(
                           value: u,
@@ -514,8 +627,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
   Widget _buildPricingTab() {
     final cost = double.tryParse(_costPriceCtrl.text) ?? 0;
     final sale = double.tryParse(_salePriceCtrl.text) ?? 0;
+    final costBox = double.tryParse(_costPerBoxCtrl.text) ?? 0;
+    final units = int.tryParse(_unitsPerBoxCtrl.text) ?? 1;
     final marginPct = cost > 0 ? ((sale - cost) / cost * 100) : 0.0;
     final profit = sale - cost;
+    final profitBox = units > 1 ? (sale * units) - costBox : profit;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -524,100 +640,324 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
           constraints: const BoxConstraints(maxWidth: 900),
           child: Column(
             children: [
-              // Pricing
-              _section('Precios', LucideIcons.dollarSign, [
-                // Cost + Margin row
+              // ── Empaque / Caja ──
+              _section('Empaque y Unidades', LucideIcons.package, [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
+                      flex: 2,
                       child: _field(
-                        controller: _costPriceCtrl,
-                        label: 'Precio de Costo *',
+                        controller: _costPerBoxCtrl,
+                        label: 'Costo Total de Caja/Empaque *',
                         prefix: r'$ ',
                         isNumeric: true,
-                        validator: (v) =>
-                            v?.isEmpty ?? true ? 'Requerido' : null,
+                        hint: 'Ej: 8.80 (lo que pagas por la caja)',
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: _field(
-                        controller: _marginCtrl,
-                        label: 'Ganancia %',
-                        suffix: '%',
+                        controller: _unitsPerBoxCtrl,
+                        label: 'Unidades por Caja',
+                        icon: LucideIcons.layers,
                         isNumeric: true,
+                        hint: 'Ej: 20',
                       ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
-                      child: _field(
-                        controller: _salePriceCtrl,
-                        label: 'Precio de Venta *',
-                        prefix: r'$ ',
-                        isNumeric: true,
-                        validator: (v) =>
-                            v?.isEmpty ?? true ? 'Requerido' : null,
+                      flex: 2,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF059669).withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.2)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Costo por Unidad',
+                                style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF475569))),
+                            const SizedBox(height: 4),
+                            Text(
+                              cost > 0 ? '\$ ${cost.toStringAsFixed(4)}' : '\$ 0.00',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 18, fontWeight: FontWeight.w700, color: const Color(0xFF059669)),
+                            ),
+                            if (units > 1)
+                              Text(
+                                '${costBox.toStringAsFixed(2)} ÷ $units = ${cost.toStringAsFixed(4)}',
+                                style: GoogleFonts.jetBrainsMono(fontSize: 10, color: const Color(0xFF64748B)),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _field(
-                        controller: _wholesalePriceCtrl,
-                        label: 'Precio Mayoreo',
-                        prefix: r'$ ',
-                        isNumeric: true,
-                      ),
+                const SizedBox(height: 8),
+                _switchTile(
+                  'Venta Fraccionada',
+                  'Permite vender por unidad individual y por caja completa',
+                  _allowFractions,
+                  (v) => setState(() => _allowFractions = v),
+                  icon: LucideIcons.scissors,
+                ),
+                if (_allowFractions && units > 1)
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(width: 16),
-                    const Expanded(child: SizedBox()),
-                    const SizedBox(width: 16),
-                    const Expanded(child: SizedBox()),
-                  ],
+                    child: Row(
+                      children: [
+                        const Icon(LucideIcons.info, size: 16, color: AppColors.info),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'En el POS se podrá vender 1 unidad a \$${sale.toStringAsFixed(2)} '
+                            'o la caja de $units unidades a \$${(sale * units).toStringAsFixed(2)}',
+                            style: GoogleFonts.inter(fontSize: 12, color: AppColors.info),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ]),
+              const SizedBox(height: 16),
+
+              // ── Precios por Nivel de Utilidad ──
+              _section('Precios por Nivel de Utilidad', LucideIcons.trendingUp, [
+                // Precio 1 (Principal)
+                _priceTierRow(
+                  tierLabel: 'Precio Principal',
+                  tierColor: const Color(0xFF2563EB),
+                  tierIcon: LucideIcons.star,
+                  marginCtrl: _marginCtrl,
+                  priceCtrl: _salePriceCtrl,
+                  cost: cost,
+                  hint: 'Precio al público / regular',
+                ),
+                const Divider(height: 24),
+
+                // Precio Mayoreo (Caja completa)
+                _priceTierRow(
+                  tierLabel: 'Precio Mayoreo / Caja',
+                  tierColor: const Color(0xFF059669),
+                  tierIcon: LucideIcons.packageCheck,
+                  marginCtrl: _marginWholesaleCtrl,
+                  priceCtrl: _wholesalePriceCtrl,
+                  cost: cost,
+                  hint: 'Precio por caja completa o mayoreo',
+                ),
+                const Divider(height: 24),
+
+                // Precio 2 (Descuento)
+                _priceTierRow(
+                  tierLabel: 'Precio Descuento (Nivel 2)',
+                  tierColor: const Color(0xFFD97706),
+                  tierIcon: LucideIcons.tag,
+                  marginCtrl: _margin2Ctrl,
+                  priceCtrl: _price2Ctrl,
+                  cost: cost,
+                  hint: 'Ej: clientes frecuentes, 20% desc.',
+                ),
+                const Divider(height: 24),
+
+                // Precio 3 (Descuento máximo)
+                _priceTierRow(
+                  tierLabel: 'Precio Mínimo (Nivel 3)',
+                  tierColor: const Color(0xFFDC2626),
+                  tierIcon: LucideIcons.arrowDownCircle,
+                  marginCtrl: _margin3Ctrl,
+                  priceCtrl: _price3Ctrl,
+                  cost: cost,
+                  hint: 'Ej: descuento máximo permitido',
                 ),
               ]),
               const SizedBox(height: 16),
 
-              // Profit summary card
+              // ── Resumen de Utilidad ──
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      AppColors.primary.withValues(alpha: 0.05),
-                      AppColors.primaryLight.withValues(alpha: 0.05),
+                      const Color(0xFF2563EB).withValues(alpha: 0.04),
+                      const Color(0xFF7C3AED).withValues(alpha: 0.04),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.2)),
+                      color: const Color(0xFF2563EB).withValues(alpha: 0.15)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2563EB).withValues(alpha: 0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    _profitItem('Costo', cost.currency, LucideIcons.arrowDown,
-                        AppColors.error),
-                    _profitDivider(),
-                    _profitItem('Venta', sale.currency, LucideIcons.arrowUp,
-                        AppColors.primary),
-                    _profitDivider(),
-                    _profitItem(
-                        'Ganancia',
-                        profit.currency,
-                        LucideIcons.trendingUp,
-                        profit > 0 ? AppColors.success : AppColors.error),
-                    _profitDivider(),
-                    _profitItem(
-                        'Margen',
-                        '${marginPct.toStringAsFixed(1)}%',
-                        LucideIcons.percent,
-                        AppColors.secondary),
+                    Row(
+                      children: [
+                        Icon(LucideIcons.barChart3, size: 16, color: const Color(0xFF2563EB)),
+                        const SizedBox(width: 8),
+                        Text('Resumen de Rentabilidad',
+                            style: GoogleFonts.poppins(
+                                fontSize: 13, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B))),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        _profitItem('Costo Unit.', cost > 0 ? cost.currency : '\$0.00',
+                            LucideIcons.arrowDown, AppColors.error),
+                        _profitDivider(),
+                        _profitItem('Venta', sale > 0 ? sale.currency : '\$0.00',
+                            LucideIcons.arrowUp, AppColors.primary),
+                        _profitDivider(),
+                        _profitItem(
+                            'Ganancia',
+                            profit > 0 ? profit.currency : '\$0.00',
+                            LucideIcons.trendingUp,
+                            profit > 0 ? AppColors.success : AppColors.error),
+                        _profitDivider(),
+                        _profitItem(
+                            'Utilidad',
+                            '${marginPct.toStringAsFixed(1)}%',
+                            LucideIcons.percent,
+                            AppColors.secondary),
+                      ],
+                    ),
+                    if (units > 1) ...[
+                      const Divider(height: 20),
+                      Row(
+                        children: [
+                          _profitItem('Costo Caja',
+                              costBox > 0 ? costBox.currency : '\$0.00',
+                              LucideIcons.package, const Color(0xFF475569)),
+                          _profitDivider(),
+                          _profitItem('Venta Caja',
+                              (sale * units).currency,
+                              LucideIcons.packageCheck, AppColors.primary),
+                          _profitDivider(),
+                          _profitItem('Ganancia Caja',
+                              profitBox > 0 ? profitBox.currency : '\$0.00',
+                              LucideIcons.trendingUp,
+                              profitBox > 0 ? AppColors.success : AppColors.error),
+                          _profitDivider(),
+                          _profitItem(
+                              '$units unidades',
+                              'por caja',
+                              LucideIcons.layers,
+                              const Color(0xFF7C3AED)),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: 16),
+
+              // ── Stock Inicial (solo al crear) ──
+              if (!_isEditing)
+                _section('Stock Inicial', LucideIcons.packagePlus, [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: _field(
+                          controller: _currentStockCtrl,
+                          label: '¿Cuántas unidades ingresan?',
+                          icon: LucideIcons.package,
+                          isNumeric: true,
+                          hint: 'Ej: 50',
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Quick-fill buttons
+                      ...([1, 10, 50, 100]).map((n) => Padding(
+                        padding: const EdgeInsets.only(left: 6, bottom: 2),
+                        child: _QuickStockChip(
+                          label: n.toString(),
+                          onTap: () => setState(() => _currentStockCtrl.text = n.toString()),
+                          isSelected: _currentStockCtrl.text == n.toString(),
+                        ),
+                      )),
+                    ],
+                  ),
+                  if (units > 1) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF7C3AED).withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.15)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(LucideIcons.calculator, size: 16, color: Color(0xFF7C3AED)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${_currentStockCtrl.text.isEmpty ? "0" : _currentStockCtrl.text} unidades = '
+                              '${((int.tryParse(_currentStockCtrl.text) ?? 0) / units).toStringAsFixed(1)} cajas '
+                              'de $units unidades',
+                              style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF7C3AED)),
+                            ),
+                          ),
+                          // Quick fill by boxes
+                          TextButton.icon(
+                            onPressed: () {
+                              final boxes = int.tryParse(_currentStockCtrl.text) ?? 0;
+                              setState(() => _currentStockCtrl.text = (boxes > 0 ? boxes * units : units).toString());
+                            },
+                            icon: const Icon(LucideIcons.package, size: 14),
+                            label: Text('× Caja', style: GoogleFonts.inter(fontSize: 11)),
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF7C3AED),
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _field(
+                          controller: _minStockCtrl,
+                          label: 'Stock Mínimo (alerta)',
+                          icon: LucideIcons.bellRing,
+                          isNumeric: true,
+                          hint: '10',
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _field(
+                          controller: _maxStockCtrl,
+                          label: 'Stock Máximo',
+                          icon: LucideIcons.arrowUp,
+                          isNumeric: true,
+                          hint: '100',
+                        ),
+                      ),
+                    ],
+                  ),
+                ]),
+              if (!_isEditing) const SizedBox(height: 16),
 
               // Tax settings
               _section('Impuestos', LucideIcons.receipt, [
@@ -648,7 +988,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'IVA 15% se aplicará al precio de venta. PVP con IVA: ${(sale * 1.15).currency}',
+                            'IVA 15% se aplicará al precio de venta. PVP con IVA: ${(sale * 1.15).currency}'
+                            '${units > 1 ? " | Caja con IVA: ${(sale * units * 1.15).currency}" : ""}',
                             style: GoogleFonts.inter(
                                 fontSize: 12, color: AppColors.info),
                           ),
@@ -661,6 +1002,120 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
           ),
         ),
       ),
+    );
+  }
+
+  /// Row for each price tier: [Badge] [Margin %] → [Price $] [Utility info]
+  Widget _priceTierRow({
+    required String tierLabel,
+    required Color tierColor,
+    required IconData tierIcon,
+    required TextEditingController marginCtrl,
+    required TextEditingController priceCtrl,
+    required double cost,
+    String? hint,
+  }) {
+    final price = double.tryParse(priceCtrl.text) ?? 0;
+    final marginPct = cost > 0 && price > 0 ? ((price - cost) / cost * 100) : 0.0;
+    final profitUnit = price - cost;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: tierColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(tierIcon, size: 13, color: tierColor),
+                  const SizedBox(width: 4),
+                  Text(tierLabel,
+                      style: GoogleFonts.inter(
+                          fontSize: 12, fontWeight: FontWeight.w600, color: tierColor)),
+                ],
+              ),
+            ),
+            if (hint != null) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(hint,
+                    style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8))),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 120,
+              child: _field(
+                controller: marginCtrl,
+                label: 'Utilidad %',
+                suffix: '%',
+                isNumeric: true,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 18),
+              child: Icon(LucideIcons.arrowRight, size: 18, color: const Color(0xFF94A3B8)),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 140,
+              child: _field(
+                controller: priceCtrl,
+                label: 'Precio \$',
+                prefix: r'$ ',
+                isNumeric: true,
+              ),
+            ),
+            const SizedBox(width: 12),
+            if (cost > 0 && price > 0)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: profitUnit > 0
+                          ? const Color(0xFF059669).withValues(alpha: 0.06)
+                          : const Color(0xFFDC2626).withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          profitUnit > 0 ? LucideIcons.trendingUp : LucideIcons.trendingDown,
+                          size: 14,
+                          color: profitUnit > 0 ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Ganancia: \$${profitUnit.toStringAsFixed(2)} (${marginPct.toStringAsFixed(1)}%)',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: profitUnit > 0 ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -711,16 +1166,12 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: _selectedPresentation,
-                        decoration: InputDecoration(
-                          labelText: 'Presentación',
-                          prefixIcon:
-                              const Icon(LucideIcons.pill, size: 18),
-                          labelStyle: GoogleFonts.inter(fontSize: 14),
-                        ),
+                        decoration: _dropdownDecoration('Presentación', LucideIcons.pill),
                         isExpanded: true,
                         style: GoogleFonts.inter(
                             fontSize: 14,
-                            color: AppColors.textPrimaryLight),
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF1E293B)),
                         items: _presentations
                             .map((p) =>
                                 DropdownMenuItem(value: p, child: Text(p)))
@@ -745,16 +1196,12 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: _selectedAdminRoute,
-                        decoration: InputDecoration(
-                          labelText: 'Vía de Administración',
-                          prefixIcon: const Icon(LucideIcons.syringe,
-                              size: 18),
-                          labelStyle: GoogleFonts.inter(fontSize: 14),
-                        ),
+                        decoration: _dropdownDecoration('Vía de Administración', LucideIcons.syringe),
                         isExpanded: true,
                         style: GoogleFonts.inter(
                             fontSize: 14,
-                            color: AppColors.textPrimaryLight),
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF1E293B)),
                         items: _adminRoutes
                             .map((r) =>
                                 DropdownMenuItem(value: r, child: Text(r)))
@@ -870,15 +1317,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
                   'Almacenamiento', LucideIcons.thermometer, [
                 DropdownButtonFormField<String>(
                   value: _storageCondition,
-                  decoration: InputDecoration(
-                    labelText: 'Condiciones de Almacenamiento',
-                    prefixIcon:
-                        const Icon(LucideIcons.thermometer, size: 18),
-                    labelStyle: GoogleFonts.inter(fontSize: 14),
-                  ),
+                  decoration: _dropdownDecoration('Condiciones de Almacenamiento', LucideIcons.thermometer),
                   isExpanded: true,
                   style: GoogleFonts.inter(
-                      fontSize: 14, color: AppColors.textPrimaryLight),
+                      fontSize: 14, fontWeight: FontWeight.w500, color: const Color(0xFF1E293B)),
                   items: _storageConditions
                       .map((s) =>
                           DropdownMenuItem(value: s, child: Text(s)))
@@ -1323,44 +1765,52 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
   // ══════════════════════════════════════════════════════════════
   Widget _buildActionBar() {
     return Container(
-      height: 60,
+      height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
-        color: AppColors.surfaceLight,
-        border:
-            const Border(top: BorderSide(color: AppColors.borderLight)),
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: AppColors.primary.withValues(alpha: 0.08)),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, -3),
           ),
         ],
       ),
       child: Row(
         children: [
           // Tab navigation
-          TextButton.icon(
-            onPressed: () {
+          _navButton(
+            icon: LucideIcons.arrowLeft,
+            label: 'Anterior',
+            onTap: () {
               if (_tabController.index > 0) {
                 _tabController.animateTo(_tabController.index - 1);
               }
             },
-            icon: const Icon(LucideIcons.arrowLeft, size: 16),
-            label: const Text('Anterior'),
           ),
-          TextButton.icon(
-            onPressed: () {
+          const SizedBox(width: 4),
+          _navButton(
+            icon: LucideIcons.arrowRight,
+            label: 'Siguiente',
+            iconRight: true,
+            onTap: () {
               if (_tabController.index < 3) {
                 _tabController.animateTo(_tabController.index + 1);
               }
             },
-            icon: const Icon(LucideIcons.arrowRight, size: 16),
-            label: const Text('Siguiente'),
           ),
           const Spacer(),
           OutlinedButton(
             onPressed: () => context.go('/products'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF64748B),
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
             child: const Text('Cancelar'),
           ),
           const SizedBox(width: 12),
@@ -1379,10 +1829,38 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
                   ),
             label: Text(_isEditing ? 'Guardar Cambios' : 'Crear Producto'),
             style: ElevatedButton.styleFrom(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _navButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool iconRight = false,
+  }) {
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        foregroundColor: const Color(0xFF475569),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!iconRight) Icon(icon, size: 15),
+          if (!iconRight) const SizedBox(width: 6),
+          Text(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500)),
+          if (iconRight) const SizedBox(width: 6),
+          if (iconRight) Icon(icon, size: 15),
         ],
       ),
     );
@@ -1391,31 +1869,102 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
   // ══════════════════════════════════════════════════════════════
   // ── HELPERS ──
   // ══════════════════════════════════════════════════════════════
+
+  InputDecoration _dropdownDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon, size: 18, color: AppColors.primary.withValues(alpha: 0.6)),
+      labelStyle: GoogleFonts.inter(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: const Color(0xFF475569),
+      ),
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+      ),
+    );
+  }
+
   Widget _section(String title, IconData icon, List<Widget> children) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section header with accent
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary.withValues(alpha: 0.06),
+                  AppColors.primary.withValues(alpha: 0.02),
+                ],
+              ),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(14),
+                topRight: Radius.circular(14),
+              ),
+              border: Border(
+                bottom: BorderSide(color: AppColors.primary.withValues(alpha: 0.12)),
+              ),
+            ),
+            child: Row(
               children: [
-                Icon(icon, size: 18, color: AppColors.primary),
-                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, size: 16, color: AppColors.primary),
+                ),
+                const SizedBox(width: 10),
                 Text(
                   title,
                   style: GoogleFonts.poppins(
-                      fontSize: 15, fontWeight: FontWeight.w600),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF1E293B),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            ...children.map((c) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: c,
-                )),
-          ],
-        ),
+          ),
+          // Section content
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: children.map((c) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: c,
+              )).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1438,10 +1987,39 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
         hintText: hint,
         prefixText: prefix,
         suffixText: suffix,
-        prefixIcon: icon != null ? Icon(icon, size: 18) : null,
-        labelStyle: GoogleFonts.inter(fontSize: 14),
+        prefixIcon: icon != null
+            ? Icon(icon, size: 18, color: AppColors.primary.withValues(alpha: 0.6))
+            : null,
+        labelStyle: GoogleFonts.inter(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: const Color(0xFF475569),
+        ),
+        hintStyle: GoogleFonts.inter(
+          fontSize: 13,
+          color: const Color(0xFF94A3B8),
+        ),
+        filled: true,
+        fillColor: const Color(0xFFF8FAFC),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        ),
       ),
-      style: GoogleFonts.inter(fontSize: 14),
+      style: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: const Color(0xFF1E293B),
+      ),
       keyboardType: isNumeric
           ? const TextInputType.numberWithOptions(decimal: true)
           : TextInputType.text,
@@ -1463,20 +2041,27 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
   }) {
     final c = color ?? AppColors.primary;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: value ? c.withValues(alpha: 0.04) : Colors.transparent,
+        color: value ? c.withValues(alpha: 0.06) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: value ? c.withValues(alpha: 0.3) : AppColors.borderLight,
+          color: value ? c.withValues(alpha: 0.4) : const Color(0xFFE2E8F0),
+          width: value ? 1.5 : 1,
         ),
       ),
       child: Row(
         children: [
           if (icon != null) ...[
-            Icon(icon,
-                size: 20, color: value ? c : AppColors.textTertiaryLight),
-            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: value ? c.withValues(alpha: 0.1) : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 18, color: value ? c : const Color(0xFF94A3B8)),
+            ),
+            const SizedBox(width: 12),
           ],
           Expanded(
             child: Column(
@@ -1484,11 +2069,13 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
               children: [
                 Text(title,
                     style: GoogleFonts.inter(
-                        fontSize: 13, fontWeight: FontWeight.w600)),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF1E293B))),
                 Text(subtitle,
                     style: GoogleFonts.inter(
                         fontSize: 11,
-                        color: AppColors.textSecondaryLight)),
+                        color: const Color(0xFF64748B))),
               ],
             ),
           ),
@@ -1586,6 +2173,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
         salePrice: Value(double.tryParse(_salePriceCtrl.text) ?? 0),
         wholesalePrice:
             Value(double.tryParse(_wholesalePriceCtrl.text)),
+        price2: Value(double.tryParse(_price2Ctrl.text)),
+        price3: Value(double.tryParse(_price3Ctrl.text)),
+        unitsPerBox: Value(int.tryParse(_unitsPerBoxCtrl.text) ?? 1),
+        costPerBox: Value(double.tryParse(_costPerBoxCtrl.text) ?? 0),
+        allowFractions: Value(_allowFractions),
         isTaxExempt: Value(_isTaxExempt),
         minStock: Value(double.tryParse(_minStockCtrl.text) ?? 10),
         maxStock: Value(double.tryParse(_maxStockCtrl.text)),
@@ -1649,5 +2241,43 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen>
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+}
+
+// ── Quick Stock Chip ──
+class _QuickStockChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final bool isSelected;
+  const _QuickStockChip({required this.label, required this.onTap, this.isSelected = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF2563EB).withValues(alpha: 0.12)
+              : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF2563EB).withValues(alpha: 0.4)
+                : const Color(0xFFE2E8F0),
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF475569),
+          ),
+        ),
+      ),
+    );
   }
 }

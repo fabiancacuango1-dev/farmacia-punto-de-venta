@@ -19,6 +19,8 @@ class File {
 
   Future<bool> exists() async => false;
 
+  Future<int> length() async => 0;
+
   Directory get parent {
     final lastSlash = path.lastIndexOf('/');
     return Directory(lastSlash >= 0 ? path.substring(0, lastSlash) : '.');
@@ -47,4 +49,5 @@ class Platform {
   static bool get isMacOS => false;
   static bool get isAndroid => false;
   static bool get isIOS => false;
+  static String get localHostname => 'web-browser';
 }

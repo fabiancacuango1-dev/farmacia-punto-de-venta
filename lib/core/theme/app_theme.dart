@@ -143,19 +143,21 @@ class AppTheme {
   AppTheme._();
 
   static TextTheme _buildTextTheme(TextTheme base) {
+    const dark = Color(0xFF1E293B);
+    const medium = Color(0xFF475569);
     return GoogleFonts.poppinsTextTheme(base).copyWith(
-      headlineLarge: GoogleFonts.poppins(fontWeight: FontWeight.w700, letterSpacing: -0.5),
-      headlineMedium: GoogleFonts.poppins(fontWeight: FontWeight.w600, letterSpacing: -0.3),
-      headlineSmall: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-      titleLarge: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-      titleMedium: GoogleFonts.inter(fontWeight: FontWeight.w600),
-      titleSmall: GoogleFonts.inter(fontWeight: FontWeight.w500),
-      bodyLarge: GoogleFonts.inter(height: 1.5),
-      bodyMedium: GoogleFonts.inter(height: 1.5),
-      bodySmall: GoogleFonts.inter(height: 1.4),
-      labelLarge: GoogleFonts.inter(fontWeight: FontWeight.w600, letterSpacing: 0.1),
-      labelMedium: GoogleFonts.inter(fontWeight: FontWeight.w500, letterSpacing: 0.2),
-      labelSmall: GoogleFonts.inter(fontWeight: FontWeight.w500, letterSpacing: 0.3),
+      headlineLarge: GoogleFonts.poppins(fontWeight: FontWeight.w700, letterSpacing: -0.5, color: dark),
+      headlineMedium: GoogleFonts.poppins(fontWeight: FontWeight.w600, letterSpacing: -0.3, color: dark),
+      headlineSmall: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: dark),
+      titleLarge: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: dark),
+      titleMedium: GoogleFonts.inter(fontWeight: FontWeight.w600, color: dark),
+      titleSmall: GoogleFonts.inter(fontWeight: FontWeight.w500, color: dark),
+      bodyLarge: GoogleFonts.inter(height: 1.5, color: dark),
+      bodyMedium: GoogleFonts.inter(height: 1.5, color: dark),
+      bodySmall: GoogleFonts.inter(height: 1.4, color: medium),
+      labelLarge: GoogleFonts.inter(fontWeight: FontWeight.w600, letterSpacing: 0.1, color: dark),
+      labelMedium: GoogleFonts.inter(fontWeight: FontWeight.w500, letterSpacing: 0.2, color: dark),
+      labelSmall: GoogleFonts.inter(fontWeight: FontWeight.w500, letterSpacing: 0.3, color: medium),
     );
   }
 

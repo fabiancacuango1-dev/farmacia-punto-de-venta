@@ -15,8 +15,13 @@ class Products extends Table {
   RealColumn get costPrice => real().withDefault(const Constant(0.0))();
   RealColumn get salePrice => real().withDefault(const Constant(0.0))();
   RealColumn get wholesalePrice => real().nullable()();
+  RealColumn get price2 => real().nullable()(); // Precio nivel 2 (ej: descuento 20%)
+  RealColumn get price3 => real().nullable()(); // Precio nivel 3 (ej: descuento 40%)
   RealColumn get taxRate => real().withDefault(const Constant(15.0))(); // IVA Ecuador 15%
   BoolColumn get isTaxExempt => boolean().withDefault(const Constant(false))();
+  IntColumn get unitsPerBox => integer().withDefault(const Constant(1))(); // Unidades por caja/empaque
+  RealColumn get costPerBox => real().withDefault(const Constant(0.0))(); // Costo total de la caja
+  BoolColumn get allowFractions => boolean().withDefault(const Constant(false))(); // Permite venta fraccionada (por unidad de caja)
   RealColumn get currentStock => real().withDefault(const Constant(0.0))();
   RealColumn get minStock => real().withDefault(const Constant(10.0))();
   RealColumn get maxStock => real().nullable()();

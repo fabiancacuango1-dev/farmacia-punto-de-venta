@@ -90,6 +90,32 @@ class ExcelImportService {
     'numero de lote': 'batchNumber',
     'receta': 'requiresPrescription',
     'requiere_receta': 'requiresPrescription',
+    'cod. interno': 'internalCode',
+    'código interno': 'internalCode',
+    'iva': 'taxRate',
+    'iva%': 'taxRate',
+    'tasa iva': 'taxRate',
+    'impuesto': 'taxRate',
+    'exento_iva': 'isTaxExempt',
+    'exento iva': 'isTaxExempt',
+    'iva exento': 'isTaxExempt',
+    'controlado': 'isControlled',
+    'sustancia controlada': 'isControlled',
+    'via_administracion': 'adminRoute',
+    'via administración': 'adminRoute',
+    'vía administración': 'adminRoute',
+    'vía de administración': 'adminRoute',
+    'ruta': 'adminRoute',
+    'condicion_almacenamiento': 'storageCondition',
+    'condición almacenamiento': 'storageCondition',
+    'almacenamiento': 'storageCondition',
+    'registro_sanitario': 'registroSanitario',
+    'registro sanitario': 'registroSanitario',
+    'reg. sanitario': 'registroSanitario',
+    'arcsa': 'registroSanitario',
+    'usa_inventario': 'usesInventory',
+    'usa inventario': 'usesInventory',
+    'maneja inventario': 'usesInventory',
   };
 
   /// Generate and save an Excel template for bulk product import
@@ -101,6 +127,7 @@ class ExcelImportService {
     // Headers
     final headers = [
       'Código de Barras',
+      'Código Interno',
       'Nombre',
       'Nombre Genérico',
       'Descripción',
@@ -111,6 +138,8 @@ class ExcelImportService {
       'Precio Costo',
       'Precio Venta',
       'Precio Mayoreo',
+      'IVA%',
+      'Exento IVA',
       'Existencia',
       'Inv. Mínimo',
       'Inv. Máximo',
@@ -118,9 +147,14 @@ class ExcelImportService {
       'Tipo Venta',
       'Ubicación',
       'Estante',
+      'Requiere Receta',
+      'Controlado',
+      'Vía Administración',
+      'Condición Almacenamiento',
+      'Registro Sanitario',
+      'Usa Inventario',
       'Lote',
       'Fecha Caducidad',
-      'Requiere Receta',
     ];
 
     // Header style
@@ -141,16 +175,19 @@ class ExcelImportService {
     // Example row
     final exampleData = [
       '7501234567890',
+      'MED-001',
       'Paracetamol 500mg',
       'Paracetamol',
       'Analgésico antipirético',
       'Analgésicos',
       'Tableta',
       '500mg',
-      'Genérico',
+      'MK',
       '2.50',
       '8.00',
       '6.50',
+      '15',
+      'No',
       '100',
       '20',
       '200',
@@ -158,9 +195,14 @@ class ExcelImportService {
       'Unidad/Pieza',
       'Estante A-1',
       'Pasillo 2',
+      'No',
+      'No',
+      'Oral',
+      'Temperatura ambiente',
+      'ARCSA-12345',
+      'Sí',
       'LOT2024-001',
       '2026-12-31',
-      'No',
     ];
 
     final exampleStyle = xlsio.CellStyle(workbook);
@@ -181,21 +223,54 @@ class ExcelImportService {
 
     final instructions = [
       '',
-      '1. Llene sus productos en la hoja "Productos" a partir de la fila 2.',
-      '2. La fila 2 es un ejemplo, puede eliminarla o reemplazarla.',
-      '3. Solo el campo "Nombre" es obligatorio.',
-      '4. Precios deben ser números (ej: 15.50).',
-      '5. "Tipo Venta" puede ser: Unidad/Pieza, A Granel (Decimales), Paquete/Kit.',
-      '6. "Requiere Receta" puede ser: Sí/No, 1/0, true/false.',
-      '7. "Fecha Caducidad" debe ser formato YYYY-MM-DD (ej: 2026-12-31).',
-      '8. Si incluye Lote y Fecha Caducidad, se creará un lote automáticamente.',
-      '9. Si el código de barras ya existe, se ACTUALIZA el producto existente.',
+      '╔══════════════════════════════════════════════════════════╗',
+      '║     INSTRUCCIONES PARA CARGA MASIVA DE PRODUCTOS       ║',
+      '╚══════════════════════════════════════════════════════════╝',
       '',
-      'UNIDADES VÁLIDAS:',
-      'unidad, caja, frasco, tubo, sobre, ampolla, vial, blíster, tira, rollo, litro, galón, gramo, kilogramo',
+      '▶ PASOS:',
+      '  1. Llene sus productos en la hoja "Productos" a partir de la fila 2.',
+      '  2. La fila 2 es un ejemplo, puede eliminarla o reemplazarla.',
+      '  3. Solo el campo "Nombre" es obligatorio.',
+      '  4. Si el Código de Barras ya existe en el sistema, se ACTUALIZA.',
+      '  5. Guarde el archivo y súbalo desde el módulo Productos.',
       '',
-      'PRESENTACIONES VÁLIDAS:',
-      'Tableta, Cápsula, Jarabe, Inyectable, Crema, Gel, Gotas, Suspensión, Polvo, Sobre, Aerosol, Parche, Otro',
+      '▶ CAMPOS DE TEXTO LIBRE:',
+      '  • Código de Barras, Código Interno, Nombre, Nombre Genérico, Descripción',
+      '  • Laboratorio, Registro Sanitario',
+      '',
+      '▶ CAMPOS NUMÉRICOS (usar punto decimal):',
+      '  • Precio Costo, Precio Venta, Precio Mayoreo (ej: 15.50)',
+      '  • IVA% (ej: 15 para 15%)',
+      '  • Existencia, Inv. Mínimo, Inv. Máximo',
+      '',
+      '▶ CAMPOS SÍ/NO (acepta: Sí, No, 1, 0, true, false):',
+      '  • Exento IVA, Requiere Receta, Controlado, Usa Inventario',
+      '',
+      '▶ TIPO VENTA (valores válidos):',
+      '  Unidad/Pieza, A Granel (Decimales), Paquete/Kit',
+      '',
+      '▶ UNIDADES VÁLIDAS:',
+      '  unidad, caja, frasco, tubo, sobre, ampolla, vial, blíster, tira, rollo,',
+      '  litro, galón, gramo, kilogramo',
+      '',
+      '▶ PRESENTACIONES VÁLIDAS:',
+      '  Tableta, Cápsula, Jarabe, Inyectable, Crema, Gel, Gotas,',
+      '  Suspensión, Polvo, Sobre, Aerosol, Parche, Supositorio, Otro',
+      '',
+      '▶ VÍAS DE ADMINISTRACIÓN:',
+      '  Oral, Tópica, Intravenosa, Intramuscular, Subcutánea, Rectal,',
+      '  Oftálmica, Ótica, Nasal, Inhalatoria, Sublingual, Otra',
+      '',
+      '▶ CONDICIONES DE ALMACENAMIENTO:',
+      '  Temperatura ambiente, Refrigeración (2-8°C), Congelación,',
+      '  Proteger de la luz, Lugar seco',
+      '',
+      '▶ LOTES Y CADUCIDAD:',
+      '  • Si incluye Lote y/o Fecha Caducidad se creará lote automáticamente.',
+      '  • Fecha Caducidad: formato YYYY-MM-DD (ej: 2026-12-31)',
+      '',
+      '▶ DEPARTAMENTOS:',
+      '  Si escribe un departamento que no existe, se creará automáticamente.',
     ];
 
     for (var i = 0; i < instructions.length; i++) {
@@ -217,9 +292,19 @@ class ExcelImportService {
     return filePath;
   }
 
+  /// Generate template and return raw bytes (for save-file dialog)
+  Future<List<int>> generateTemplateBytes() async {
+    final path = await generateTemplate();
+    return await File(path).readAsBytes();
+  }
+
   /// Import products from an Excel file
   Future<ImportExcelResult> importFromExcel(String filePath) async {
     final bytes = await File(filePath).readAsBytes();
+    return importFromExcelBytes(bytes);
+  }
+
+  Future<ImportExcelResult> importFromExcelBytes(List<int> bytes) async {
     final excel = Excel.decodeBytes(bytes);
 
     final errors = <String>[];
@@ -303,6 +388,10 @@ class ExcelImportService {
         final minStock = double.tryParse(data['minStock'] ?? '') ?? 10;
         final maxStock = double.tryParse(data['maxStock'] ?? '');
         final requiresRx = _parseBool(data['requiresPrescription']);
+        final taxRate = double.tryParse(data['taxRate']?.replaceAll('%', '') ?? '');
+        final isTaxExempt = _parseBool(data['isTaxExempt']);
+        final isControlled = _parseBool(data['isControlled']);
+        final usesInventory = data['usesInventory'] != null ? _parseBool(data['usesInventory']) : true;
 
         // Match category
         String? categoryId;
@@ -331,6 +420,7 @@ class ExcelImportService {
           await (_db.update(_db.products)..where((p) => p.id.equals(existing!.id))).write(
             ProductsCompanion(
               name: Value(name),
+              internalCode: Value(data['internalCode']),
               genericName: Value(data['genericName']),
               description: Value(data['description']),
               categoryId: Value(categoryId),
@@ -340,6 +430,8 @@ class ExcelImportService {
               costPrice: Value(costPrice),
               salePrice: Value(salePrice),
               wholesalePrice: Value(wholesalePrice),
+              taxRate: taxRate != null ? Value(taxRate) : const Value.absent(),
+              isTaxExempt: Value(isTaxExempt),
               currentStock: Value(stock),
               minStock: Value(minStock),
               maxStock: Value(maxStock),
@@ -348,6 +440,11 @@ class ExcelImportService {
               location: Value(data['location']),
               shelf: Value(data['shelf']),
               requiresPrescription: Value(requiresRx),
+              isControlled: Value(isControlled),
+              adminRoute: Value(data['adminRoute']),
+              storageCondition: Value(data['storageCondition']),
+              registroSanitario: Value(data['registroSanitario']),
+              usesInventory: Value(usesInventory),
               updatedAt: Value(DateTime.now()),
               syncStatus: const Value('pending'),
             ),
@@ -370,6 +467,8 @@ class ExcelImportService {
             costPrice: Value(costPrice),
             salePrice: Value(salePrice),
             wholesalePrice: Value(wholesalePrice),
+            taxRate: taxRate != null ? Value(taxRate) : const Value.absent(),
+            isTaxExempt: Value(isTaxExempt),
             currentStock: Value(stock),
             minStock: Value(minStock),
             maxStock: Value(maxStock),
@@ -378,6 +477,11 @@ class ExcelImportService {
             location: Value(data['location']),
             shelf: Value(data['shelf']),
             requiresPrescription: Value(requiresRx),
+            isControlled: Value(isControlled),
+            adminRoute: Value(data['adminRoute']),
+            storageCondition: Value(data['storageCondition']),
+            registroSanitario: Value(data['registroSanitario']),
+            usesInventory: Value(usesInventory),
           ));
           imported++;
 
@@ -421,11 +525,12 @@ class ExcelImportService {
     sheet.name = 'Productos';
 
     final headers = [
-      'Código de Barras', 'Nombre', 'Nombre Genérico', 'Descripción',
+      'Código de Barras', 'Código Interno', 'Nombre', 'Nombre Genérico', 'Descripción',
       'Departamento', 'Presentación', 'Concentración', 'Laboratorio',
-      'Costo', 'P. Venta', 'P. Mayoreo', 'Existencia',
-      'Inv. Mínimo', 'Inv. Máximo', 'Unidad', 'Tipo Venta',
-      'Ubicación', 'Estante', 'Receta',
+      'Costo', 'P. Venta', 'P. Mayoreo', 'IVA%', 'Exento IVA',
+      'Existencia', 'Inv. Mínimo', 'Inv. Máximo', 'Unidad', 'Tipo Venta',
+      'Ubicación', 'Estante', 'Receta', 'Controlado',
+      'Vía Administración', 'Condición Almacenamiento', 'Registro Sanitario', 'Usa Inventario',
     ];
 
     final headerStyle = xlsio.CellStyle(workbook);
@@ -444,24 +549,32 @@ class ExcelImportService {
       final prod = products[r];
       final row = r + 2;
       sheet.getRangeByIndex(row, 1).setText(prod.barcode ?? '');
-      sheet.getRangeByIndex(row, 2).setText(prod.name);
-      sheet.getRangeByIndex(row, 3).setText(prod.genericName ?? '');
-      sheet.getRangeByIndex(row, 4).setText(prod.description ?? '');
-      sheet.getRangeByIndex(row, 5).setText(categoryMap[prod.categoryId] ?? '');
-      sheet.getRangeByIndex(row, 6).setText(prod.presentation ?? '');
-      sheet.getRangeByIndex(row, 7).setText(prod.concentration ?? '');
-      sheet.getRangeByIndex(row, 8).setText(prod.laboratory ?? '');
-      sheet.getRangeByIndex(row, 9).setNumber(prod.costPrice);
-      sheet.getRangeByIndex(row, 10).setNumber(prod.salePrice);
-      sheet.getRangeByIndex(row, 11).setNumber(prod.wholesalePrice ?? 0);
-      sheet.getRangeByIndex(row, 12).setNumber(prod.currentStock);
-      sheet.getRangeByIndex(row, 13).setNumber(prod.minStock);
-      sheet.getRangeByIndex(row, 14).setNumber(prod.maxStock ?? 0);
-      sheet.getRangeByIndex(row, 15).setText(prod.unit);
-      sheet.getRangeByIndex(row, 16).setText(prod.saleType);
-      sheet.getRangeByIndex(row, 17).setText(prod.location ?? '');
-      sheet.getRangeByIndex(row, 18).setText(prod.shelf ?? '');
-      sheet.getRangeByIndex(row, 19).setText(prod.requiresPrescription ? 'Sí' : 'No');
+      sheet.getRangeByIndex(row, 2).setText(prod.internalCode ?? '');
+      sheet.getRangeByIndex(row, 3).setText(prod.name);
+      sheet.getRangeByIndex(row, 4).setText(prod.genericName ?? '');
+      sheet.getRangeByIndex(row, 5).setText(prod.description ?? '');
+      sheet.getRangeByIndex(row, 6).setText(categoryMap[prod.categoryId] ?? '');
+      sheet.getRangeByIndex(row, 7).setText(prod.presentation ?? '');
+      sheet.getRangeByIndex(row, 8).setText(prod.concentration ?? '');
+      sheet.getRangeByIndex(row, 9).setText(prod.laboratory ?? '');
+      sheet.getRangeByIndex(row, 10).setNumber(prod.costPrice);
+      sheet.getRangeByIndex(row, 11).setNumber(prod.salePrice);
+      sheet.getRangeByIndex(row, 12).setNumber(prod.wholesalePrice ?? 0);
+      sheet.getRangeByIndex(row, 13).setNumber(prod.taxRate);
+      sheet.getRangeByIndex(row, 14).setText(prod.isTaxExempt ? 'Sí' : 'No');
+      sheet.getRangeByIndex(row, 15).setNumber(prod.currentStock);
+      sheet.getRangeByIndex(row, 16).setNumber(prod.minStock);
+      sheet.getRangeByIndex(row, 17).setNumber(prod.maxStock ?? 0);
+      sheet.getRangeByIndex(row, 18).setText(prod.unit);
+      sheet.getRangeByIndex(row, 19).setText(prod.saleType);
+      sheet.getRangeByIndex(row, 20).setText(prod.location ?? '');
+      sheet.getRangeByIndex(row, 21).setText(prod.shelf ?? '');
+      sheet.getRangeByIndex(row, 22).setText(prod.requiresPrescription ? 'Sí' : 'No');
+      sheet.getRangeByIndex(row, 23).setText(prod.isControlled ? 'Sí' : 'No');
+      sheet.getRangeByIndex(row, 24).setText(prod.adminRoute ?? '');
+      sheet.getRangeByIndex(row, 25).setText(prod.storageCondition ?? '');
+      sheet.getRangeByIndex(row, 26).setText(prod.registroSanitario ?? '');
+      sheet.getRangeByIndex(row, 27).setText(prod.usesInventory ? 'Sí' : 'No');
     }
 
     // Auto-fit columns

@@ -1,16 +1,25 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:drift/drift.dart' hide Column;
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../../utils/platform_io.dart'
+    if (dart.library.js_interop) '../../../utils/platform_io_web.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/extensions/extensions.dart';
 import '../../../data/database/app_database.dart';
+import '../../../services/ai/smart_import_service.dart';
 import '../../../services/import_export/excel_import_service.dart';
-import '../../../services/import_export/xml_invoice_import_service.dart';
+import '../../../services/import_export/pdf_invoice_preview.dart';
+import '../../../services/import_export/xml_invoice_preview.dart';
+import 'xml_invoice_preview_dialog.dart';
 
 // ── Filter State ──
 final _searchProvider = StateProvider.autoDispose<String>((ref) => '');
@@ -87,6 +96,38 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             ),
           ),
           const Spacer(),
+          // Quick return to POS
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => context.go('/'),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(LucideIcons.arrowLeft, color: Colors.white, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Volver al POS',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
           StreamBuilder<List<Product>>(
             stream: db.productsDao.watchAllProducts(),
             builder: (context, snap) {
@@ -155,7 +196,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           _toolBtn(
             icon: LucideIcons.download,
             label: 'Importar',
-            color: AppColors.textSecondaryLight,
+            color: const Color(0xFF7C3AED),
             onTap: () => _showImportDialog(context),
           ),
           _toolBtn(
@@ -336,13 +377,13 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
               child: TextField(
                 controller: _searchController,
                 focusNode: _searchFocus,
-                style: GoogleFonts.inter(fontSize: 14),
+                style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1E293B)),
                 decoration: InputDecoration(
                   hintText:
                       'Buscar por nombre, código, genérico, laboratorio...',
-                  hintStyle: GoogleFonts.inter(fontSize: 13),
+                  hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),
                   prefixIcon:
-                      const Icon(LucideIcons.search, size: 18),
+                      const Icon(LucideIcons.search, size: 18, color: Color(0xFF64748B)),
                   suffixIcon: _searchController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(LucideIcons.x, size: 16),
@@ -385,7 +426,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       ),
                     ),
                     isExpanded: true,
-                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.textPrimaryLight),
+                    style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF1E293B)),
                     items: [
                       const DropdownMenuItem(
                           value: 'all', child: Text('Todas las categorías')),
@@ -575,7 +616,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       width: 70,
                       child: Text('Estado',
                           style: GoogleFonts.inter(
-                              fontSize: 12, fontWeight: FontWeight.w600)),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF334155))),
                     ),
                     const SizedBox(width: 90), // Actions
                   ],
@@ -615,7 +658,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                                 p.barcode ?? p.id.substring(0, 8),
                                 style: GoogleFonts.jetBrainsMono(
                                     fontSize: 12,
-                                    color: AppColors.textSecondaryLight),
+                                    color: const Color(0xFF475569)),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -631,7 +674,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                                     p.name,
                                     style: GoogleFonts.inter(
                                       fontSize: 13,
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF1E293B),
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -641,8 +685,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                                       '${p.genericName}${p.concentration != null ? ' • ${p.concentration}' : ''}',
                                       style: GoogleFonts.inter(
                                         fontSize: 11,
-                                        color:
-                                            AppColors.textTertiaryLight,
+                                        color: const Color(0xFF64748B),
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -652,7 +695,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                             Expanded(
                               child: Text(
                                 p.laboratory ?? '-',
-                                style: GoogleFonts.inter(fontSize: 12),
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF475569),
+                                ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
@@ -660,7 +706,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                               width: 90,
                               child: Text(
                                 p.costPrice.currency,
-                                style: GoogleFonts.inter(fontSize: 12),
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF334155),
+                                ),
                                 textAlign: TextAlign.right,
                               ),
                             ),
@@ -814,7 +863,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
               fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
               color: isActive
                   ? AppColors.primary
-                  : AppColors.textPrimaryLight,
+                  : const Color(0xFF334155),
             ),
           ),
           if (isActive)
@@ -996,6 +1045,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
       builder: (ctx) => _ImportDialog(db: db),
     );
   }
+
+
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1080,7 +1131,7 @@ class _CategoryManagerDialogState extends State<_CategoryManagerDialog> {
                       return ListTile(
                         leading: const Icon(LucideIcons.folder, size: 18),
                         title: Text(c.name,
-                            style: GoogleFonts.inter(fontSize: 14)),
+                            style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF1E293B))),
                         dense: true,
                       );
                     },
@@ -1148,7 +1199,7 @@ class _ExpiringBatchesDialog extends StatelessWidget {
                         size: 48, color: AppColors.success),
                     const SizedBox(height: 12),
                     Text('No hay lotes por vencer',
-                        style: GoogleFonts.inter(fontSize: 15)),
+                        style: GoogleFonts.inter(fontSize: 15, color: const Color(0xFF1E293B))),
                   ],
                 ),
               );
@@ -1169,7 +1220,7 @@ class _ExpiringBatchesDialog extends StatelessWidget {
                           fontSize: 13, fontWeight: FontWeight.w600)),
                   subtitle: Text(
                     'Vence: ${b.expirationDate.formatted} • Cant: ${b.quantity.toInt()}',
-                    style: GoogleFonts.inter(fontSize: 12),
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                   ),
                   trailing: expired
                       ? Container(
@@ -1250,7 +1301,7 @@ class _ProductBatchesDialog extends StatelessWidget {
                           fontSize: 13, fontWeight: FontWeight.w500)),
                   subtitle: Text(
                     'Vence: ${b.expirationDate.formatted} • Cant: ${b.quantity.toInt()}',
-                    style: GoogleFonts.inter(fontSize: 12),
+                    style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                   ),
                   dense: true,
                 );
@@ -1270,7 +1321,7 @@ class _ProductBatchesDialog extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════════
-// ── IMPORT DIALOG ──
+// ── IMPORT DIALOG (Restructured with Smart Import + AI) ──
 // ══════════════════════════════════════════════════════════════
 class _ImportDialog extends StatefulWidget {
   final AppDatabase db;
@@ -1283,14 +1334,17 @@ class _ImportDialog extends StatefulWidget {
 class _ImportDialogState extends State<_ImportDialog>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late SmartImportService _smartService;
   bool _isLoading = false;
   String? _resultMessage;
   bool _isError = false;
+  List<String> _errorDetails = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _smartService = SmartImportService(widget.db);
   }
 
   @override
@@ -1304,22 +1358,39 @@ class _ImportDialogState extends State<_ImportDialog>
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SizedBox(
-        width: 580,
-        height: 520,
+        width: 660,
+        height: 600,
         child: Column(
           children: [
-            // Header
+            // ── Header ──
             Container(
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
               child: Row(
                 children: [
-                  const Icon(LucideIcons.download, color: AppColors.primary, size: 22),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Importar Productos',
-                    style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(LucideIcons.fileUp, color: AppColors.primary, size: 20),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Importar Productos',
+                          style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B)),
+                        ),
+                        Text(
+                          'Importación desde Excel y XML',
+                          style: GoogleFonts.inter(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
                   IconButton(
                     icon: const Icon(LucideIcons.x, size: 20),
                     onPressed: () => Navigator.pop(context),
@@ -1328,24 +1399,19 @@ class _ImportDialogState extends State<_ImportDialog>
               ),
             ),
 
-            // Tabs
+            // ── Tabs ──
             TabBar(
               controller: _tabController,
               labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+              indicatorColor: AppColors.primary,
               tabs: const [
-                Tab(
-                  icon: Icon(LucideIcons.fileSpreadsheet, size: 18),
-                  text: 'Excel',
-                ),
-                Tab(
-                  icon: Icon(LucideIcons.fileCode, size: 18),
-                  text: 'Facturas XML',
-                ),
+                Tab(icon: Icon(LucideIcons.fileSpreadsheet, size: 18), text: 'Excel'),
+                Tab(icon: Icon(LucideIcons.fileCode, size: 18), text: 'XML Facturas'),
               ],
             ),
             const Divider(height: 1),
 
-            // Tab Content
+            // ── Tab Content ──
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -1356,40 +1422,16 @@ class _ImportDialogState extends State<_ImportDialog>
               ),
             ),
 
-            // Result banner
+            // ── Result Banner ──
             if (_resultMessage != null)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                color: (_isError ? AppColors.error : AppColors.success).withValues(alpha: 0.1),
-                child: Row(
-                  children: [
-                    Icon(
-                      _isError ? LucideIcons.alertCircle : LucideIcons.checkCircle,
-                      size: 18,
-                      color: _isError ? AppColors.error : AppColors.success,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        _resultMessage!,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: _isError ? AppColors.error : AppColors.success,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildResultBanner(),
 
-            // Loading
-            if (_isLoading) const LinearProgressIndicator(),
+            if (_isLoading)
+              const LinearProgressIndicator(),
 
-            // Bottom actions
+            // ── Bottom ──
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(14),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -1406,58 +1448,104 @@ class _ImportDialogState extends State<_ImportDialog>
     );
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // ── RESULT BANNER ──
+  // ══════════════════════════════════════════════════════════════
+  Widget _buildResultBanner() {
+    final bgColor = (_isError ? AppColors.error : AppColors.success).withValues(alpha: 0.08);
+    final fgColor = _isError ? AppColors.error : AppColors.success;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: bgColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(
+                _isError ? LucideIcons.alertCircle : LucideIcons.checkCircle2,
+                size: 18,
+                color: fgColor,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _resultMessage!,
+                  style: GoogleFonts.inter(fontSize: 13, color: fgColor, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          if (_errorDetails.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            ...(_errorDetails.take(5).map((e) => Padding(
+              padding: const EdgeInsets.only(left: 26, top: 2),
+              child: Text('• $e',
+                  style: GoogleFonts.inter(fontSize: 11, color: AppColors.error),
+                  maxLines: 2, overflow: TextOverflow.ellipsis),
+            ))),
+            if (_errorDetails.length > 5)
+              Padding(
+                padding: const EdgeInsets.only(left: 26, top: 2),
+                child: Text('... y ${_errorDetails.length - 5} errores más',
+                    style: GoogleFonts.inter(fontSize: 11, color: AppColors.textTertiaryLight)),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════
   // ── EXCEL TAB ──
+  // ══════════════════════════════════════════════════════════════
   Widget _buildExcelTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Step 1: Download template
           _stepCard(
             step: '1',
             title: 'Descargar Plantilla',
-            description: 'Descarga la plantilla Excel con las columnas correctas, llénala con tus productos.',
+            description: 'Descarga la plantilla Excel con columnas correctas. Incluye stock inicial.',
             icon: LucideIcons.download,
             color: AppColors.primary,
             child: ElevatedButton.icon(
               onPressed: _isLoading ? null : _downloadTemplate,
               icon: const Icon(LucideIcons.fileSpreadsheet, size: 16),
-              label: const Text('Descargar Plantilla Excel'),
+              label: const Text('Descargar Plantilla'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
+                backgroundColor: AppColors.primary, foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Step 2: Upload file
+          const SizedBox(height: 14),
           _stepCard(
             step: '2',
-            title: 'Subir Archivo Excel',
-            description: 'Selecciona el archivo .xlsx con tus productos. Se actualizarán por código de barras si ya existen.',
+            title: 'Importar Productos',
+            description: 'Sube un .xlsx con tus productos. Se actualiza por código de barras, código interno, o nombre exacto.',
             icon: LucideIcons.upload,
             color: AppColors.secondary,
             child: ElevatedButton.icon(
               onPressed: _isLoading ? null : _importExcel,
               icon: const Icon(LucideIcons.fileUp, size: 16),
-              label: const Text('Seleccionar Archivo Excel'),
+              label: const Text('Seleccionar Excel'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.secondary,
-                foregroundColor: Colors.white,
+                backgroundColor: AppColors.secondary, foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Step 3: Export
+          const SizedBox(height: 14),
           _stepCard(
             step: '3',
             title: 'Exportar Productos',
-            description: 'Exporta todos los productos actuales a Excel para respaldo o edición.',
+            description: 'Exporta todos tus productos con stock a un archivo Excel.',
             icon: LucideIcons.fileOutput,
             color: AppColors.info,
             child: OutlinedButton.icon(
@@ -1466,19 +1554,27 @@ class _ImportDialogState extends State<_ImportDialog>
               label: const Text('Exportar a Excel'),
             ),
           ),
+          const SizedBox(height: 10),
+          _featureBox([
+            _ft(LucideIcons.search, 'Busca por código de barras, código interno o nombre exacto'),
+            _ft(LucideIcons.refreshCw, 'Actualiza precio, stock y datos si el producto ya existe'),
+            _ft(LucideIcons.layers, 'Crea lotes automáticamente si incluyes lote y caducidad'),
+            _ft(LucideIcons.folderPlus, 'Crea categorías automáticamente si no existen'),
+          ]),
         ],
       ),
     );
   }
 
+  // ══════════════════════════════════════════════════════════════
   // ── XML TAB ──
+  // ══════════════════════════════════════════════════════════════
   Widget _buildXmlTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Info
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -1493,78 +1589,109 @@ class _ImportDialogState extends State<_ImportDialog>
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Sube archivos XML de facturas electrónicas (CFDI). '
-                    'El sistema extraerá automáticamente los productos, precios y cantidades.',
-                    style: GoogleFonts.inter(fontSize: 13, color: AppColors.info),
+                    'Sube facturas electrónicas XML (SRI Ecuador, CFDI México, UBL). '
+                    'Extrae productos, precios, cantidades y datos del proveedor.',
+                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.info),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 20),
-
-          // Upload XML
+          const SizedBox(height: 16),
           _stepCard(
             step: '1',
             title: 'Subir Facturas XML',
-            description: 'Selecciona uno o varios archivos XML. Se importarán los productos con precios del proveedor.',
+            description: 'Selecciona uno o varios archivos .xml de facturas electrónicas.',
             icon: LucideIcons.fileCode,
             color: const Color(0xFFE65100),
             child: ElevatedButton.icon(
               onPressed: _isLoading ? null : _importXml,
               icon: const Icon(LucideIcons.fileUp, size: 16),
-              label: const Text('Seleccionar Archivos XML'),
+              label: const Text('Seleccionar XML'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE65100),
-                foregroundColor: Colors.white,
+                backgroundColor: const Color(0xFFE65100), foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          _featureBox([
+            _ft(LucideIcons.scanLine, 'Soporta SRI Ecuador, CFDI México, UBL, y formatos genéricos'),
+            _ft(LucideIcons.dollarSign, 'Importa precio de costo y calcula venta con 30% margen'),
+            _ft(LucideIcons.package, 'Suma stock si el producto ya existe'),
+            _ft(LucideIcons.building2, 'Identifica datos del proveedor (RUC/RFC)'),
+            _ft(LucideIcons.search, 'Busca por código, código interno o nombre exacto'),
+          ]),
+        ],
+      ),
+    );
+  }
 
-          // Features list
+  // ══════════════════════════════════════════════════════════════
+  // ── PDF TAB ──
+  // ══════════════════════════════════════════════════════════════
+  Widget _buildPdfTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.backgroundLight,
+              color: AppColors.accent.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.borderLight),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
             ),
-            child: Column(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Funciones automáticas:',
-                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                _featureRow(LucideIcons.scanLine, 'Extrae códigos de producto del XML'),
-                _featureRow(LucideIcons.dollarSign, 'Importa precio de costo del proveedor'),
-                _featureRow(LucideIcons.calculator, 'Calcula precio de venta con 30% margen'),
-                _featureRow(LucideIcons.package, 'Suma stock si el producto ya existe'),
-                _featureRow(LucideIcons.building2, 'Identifica datos del proveedor (RFC)'),
+                const Icon(LucideIcons.info, size: 18, color: AppColors.accent),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Sube facturas en PDF (RIDE SRI Ecuador, facturas genéricas). '
+                    'Extrae productos, precios, cantidades y datos del proveedor usando análisis de texto.',
+                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.accent),
+                  ),
+                ),
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _featureRow(IconData icon, String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          Icon(icon, size: 14, color: AppColors.success),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(text, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondaryLight)),
+          const SizedBox(height: 16),
+          _stepCard(
+            step: '1',
+            title: 'Subir Facturas PDF',
+            description: 'Selecciona uno o varios archivos .pdf de facturas. Deben tener texto seleccionable.',
+            icon: LucideIcons.fileText,
+            color: AppColors.accent,
+            child: ElevatedButton.icon(
+              onPressed: _isLoading ? null : _importPdf,
+              icon: const Icon(LucideIcons.fileUp, size: 16),
+              label: const Text('Seleccionar PDF'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent, foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+            ),
           ),
+          const SizedBox(height: 14),
+          _featureBox([
+            _ft(LucideIcons.scanLine, 'Extrae texto del PDF y detecta tabla de productos'),
+            _ft(LucideIcons.dollarSign, 'Importa precio de costo y calcula venta con 30% margen'),
+            _ft(LucideIcons.package, 'Suma stock si el producto ya existe'),
+            _ft(LucideIcons.building2, 'Identifica datos del proveedor (RUC, dirección, teléfono)'),
+            _ft(LucideIcons.search, 'Busca por código, código interno o nombre exacto'),
+            _ft(LucideIcons.eye, 'Vista previa completa antes de confirmar la importación'),
+          ]),
         ],
       ),
     );
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // ── SHARED WIDGETS ──
+  // ══════════════════════════════════════════════════════════════
   Widget _stepCard({
     required String step,
     required String title,
@@ -1599,8 +1726,7 @@ class _ImportDialogState extends State<_ImportDialog>
             ),
             child: Center(
               child: Text(step,
-                  style: GoogleFonts.poppins(
-                      fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
             ),
           ),
           const SizedBox(width: 14),
@@ -1608,11 +1734,9 @@ class _ImportDialogState extends State<_ImportDialog>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(description,
-                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondaryLight)),
+                Text(title, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 3),
+                Text(description, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondaryLight)),
                 const SizedBox(height: 10),
                 child,
               ],
@@ -1623,46 +1747,104 @@ class _ImportDialogState extends State<_ImportDialog>
     );
   }
 
-  // ── ACTIONS ──
+  Widget _featureBox(List<Widget> features) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundLight,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Funciones automáticas:',
+              style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF1E293B))),
+          const SizedBox(height: 6),
+          ...features,
+        ],
+      ),
+    );
+  }
+
+  Widget _ft(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: Row(
+        children: [
+          Icon(icon, size: 13, color: AppColors.success),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: GoogleFonts.inter(fontSize: 11, color: AppColors.textSecondaryLight)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // ── IMPORT ACTIONS ──
+  // ══════════════════════════════════════════════════════════════
+  void _showResult(SmartImportResult r) {
+    final msg = StringBuffer();
+
+    if (r.source.isNotEmpty) msg.write('[${r.source}] ');
+    msg.write('Nuevos: ${r.imported}');
+    if (r.updated > 0) msg.write(' | Actualizados: ${r.updated}');
+    if (r.skipped > 0) msg.write(' | Omitidos: ${r.skipped}');
+    if (r.batches > 0) msg.write(' | Lotes: ${r.batches}');
+    if (r.supplierCreated && r.supplierName != null) {
+      msg.write(' | Proveedor creado: ${r.supplierName}');
+    } else if (r.supplierName != null) {
+      msg.write(' | Proveedor: ${r.supplierName}');
+    }
+    if (r.invoiceNumber != null && r.invoiceNumber!.isNotEmpty) {
+      msg.write(' | Factura: ${r.invoiceNumber}');
+    }
+    if (r.hasErrors) msg.write(' | Errores: ${r.errors.length}');
+
+    setState(() {
+      _resultMessage = msg.toString();
+      _isError = r.hasErrors && r.totalProducts == 0;
+      _errorDetails = r.errors;
+    });
+  }
+
+  // ── Download Template ──
   Future<void> _downloadTemplate() async {
     setState(() { _isLoading = true; _resultMessage = null; });
     try {
       final service = ExcelImportService(widget.db);
-      final path = await service.generateTemplate();
-      setState(() {
-        _resultMessage = 'Plantilla guardada en: $path';
-        _isError = false;
-      });
-    } catch (e) {
-      setState(() { _resultMessage = 'Error: $e'; _isError = true; });
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
+      final bytes = await service.generateTemplateBytes();
 
-  Future<void> _importExcel() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls'],
-      dialogTitle: 'Seleccionar archivo Excel de productos',
-    );
-    if (result == null || result.files.single.path == null) return;
-
-    setState(() { _isLoading = true; _resultMessage = null; });
-    try {
-      final service = ExcelImportService(widget.db);
-      final importResult = await service.importFromExcel(result.files.single.path!);
-      final msg = StringBuffer()
-        ..write('Importados: ${importResult.imported}')
-        ..write(' | Actualizados: ${importResult.updated}')
-        ..write(' | Omitidos: ${importResult.skipped}');
-      if (importResult.hasErrors) {
-        msg.write(' | Errores: ${importResult.errors.length}');
+      if (kIsWeb) {
+        // On web, saveFile triggers browser download directly
+        final savePath = await FilePicker.platform.saveFile(
+          dialogTitle: 'Guardar plantilla de productos',
+          fileName: 'plantilla_productos.xlsx',
+          bytes: Uint8List.fromList(bytes),
+        );
+        setState(() {
+          _resultMessage = savePath != null ? 'Plantilla descargada' : 'Descarga cancelada';
+          _isError = savePath == null;
+        });
+      } else {
+        final savePath = await FilePicker.platform.saveFile(
+          dialogTitle: 'Guardar plantilla de productos',
+          fileName: 'plantilla_productos.xlsx',
+          type: FileType.any,
+        );
+        if (savePath == null) {
+          setState(() => _isLoading = false);
+          return;
+        }
+        final finalPath = savePath.endsWith('.xlsx') ? savePath : '$savePath.xlsx';
+        await File(finalPath).writeAsBytes(bytes);
+        setState(() {
+          _resultMessage = 'Plantilla guardada en: $finalPath';
+          _isError = false;
+        });
       }
-      setState(() {
-        _resultMessage = msg.toString();
-        _isError = importResult.hasErrors && importResult.total == 0;
-      });
     } catch (e) {
       setState(() { _resultMessage = 'Error: $e'; _isError = true; });
     } finally {
@@ -1670,15 +1852,60 @@ class _ImportDialogState extends State<_ImportDialog>
     }
   }
 
+  // ── Import Excel ──
+  Future<void> _importExcel() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        dialogTitle: 'Seleccionar archivo Excel de productos',
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.first;
+      if (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls')) {
+        setState(() {
+          _resultMessage = 'Selecciona un archivo Excel (.xlsx o .xls)';
+          _isError = true;
+        });
+        return;
+      }
+
+      List<int>? bytes;
+      if (file.bytes != null && file.bytes!.isNotEmpty) {
+        bytes = file.bytes!;
+      } else if (file.path != null) {
+        bytes = await File(file.path!).readAsBytes();
+      }
+      if (bytes == null || bytes.isEmpty) {
+        setState(() {
+          _resultMessage = 'No se pudo leer el archivo';
+          _isError = true;
+        });
+        return;
+      }
+
+      setState(() { _isLoading = true; _resultMessage = null; _errorDetails = []; });
+      final importResult = await _smartService.importExcel(bytes);
+      _showResult(importResult);
+    } catch (e) {
+      setState(() {
+        _resultMessage = 'Error al importar';
+        _isError = true;
+        _errorDetails = [e.toString()];
+      });
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // ── Export Excel ──
   Future<void> _exportExcel() async {
     setState(() { _isLoading = true; _resultMessage = null; });
     try {
       final service = ExcelImportService(widget.db);
       final path = await service.exportToExcel();
-      setState(() {
-        _resultMessage = 'Exportado en: $path';
-        _isError = false;
-      });
+      setState(() { _resultMessage = 'Exportado en: $path'; _isError = false; });
     } catch (e) {
       setState(() { _resultMessage = 'Error: $e'; _isError = true; });
     } finally {
@@ -1686,44 +1913,198 @@ class _ImportDialogState extends State<_ImportDialog>
     }
   }
 
-  Future<void> _importXml() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['xml'],
-      allowMultiple: true,
-      dialogTitle: 'Seleccionar facturas XML',
-    );
-    if (result == null || result.files.isEmpty) return;
-
-    final paths = result.files
-        .where((f) => f.path != null)
-        .map((f) => f.path!)
-        .toList();
-    if (paths.isEmpty) return;
-
-    setState(() { _isLoading = true; _resultMessage = null; });
+  // ── Import PDF ──
+  Future<void> _importPdf() async {
     try {
-      final service = XmlInvoiceImportService(widget.db);
-      final importResult = await service.importMultipleXml(paths);
-      final msg = StringBuffer()
-        ..write('${paths.length} archivo(s) procesados')
-        ..write(' | Importados: ${importResult.imported}')
-        ..write(' | Actualizados: ${importResult.updated}');
-      if (importResult.invoiceInfo.isNotEmpty) {
-        final prov = importResult.invoiceInfo['Proveedor'];
-        if (prov != null) msg.write(' | Proveedor: $prov');
+      // Use FileType.any because FileType.custom has issues on macOS
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: true,
+        withData: true,
+        dialogTitle: 'Seleccionar facturas PDF',
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final fileBytes = <List<int>>[];
+      final names = <String>[];
+      for (final file in result.files) {
+        // Filter: only accept .pdf files
+        if (!file.name.toLowerCase().endsWith('.pdf')) continue;
+
+        List<int>? bytes;
+        if (file.bytes != null && file.bytes!.isNotEmpty) {
+          bytes = file.bytes!;
+        } else if (file.path != null) {
+          try { bytes = await File(file.path!).readAsBytes(); } catch (_) {}
+        }
+        if (bytes != null && bytes.isNotEmpty) {
+          fileBytes.add(bytes);
+          names.add(file.name);
+        }
       }
-      if (importResult.hasErrors) {
-        msg.write(' | Errores: ${importResult.errors.length}');
+
+      if (fileBytes.isEmpty) {
+        setState(() {
+          _resultMessage = 'No se seleccionaron archivos PDF válidos (.pdf)';
+          _isError = true;
+        });
+        return;
       }
+
+      setState(() { _isLoading = true; _resultMessage = null; _errorDetails = []; });
+
+      final pdfService = PdfInvoicePreviewService(widget.db);
+      var totalImported = 0;
+      var totalUpdated = 0;
+      final allErrors = <String>[];
+
+      for (var i = 0; i < fileBytes.length; i++) {
+        final preview = await pdfService.parsePdf(
+          Uint8List.fromList(fileBytes[i]),
+          fileName: names[i],
+        );
+
+        setState(() => _isLoading = false);
+
+        if (!mounted) return;
+        final confirmResult = await XmlInvoicePreviewDialog.show(
+          context,
+          preview: preview,
+          service: pdfService,
+        );
+
+        if (confirmResult == null) {
+          if (fileBytes.length == 1) {
+            setState(() { _resultMessage = 'Importación cancelada'; _isError = false; });
+            return;
+          }
+          continue;
+        }
+
+        totalImported += confirmResult.imported;
+        totalUpdated += confirmResult.updated;
+        allErrors.addAll(confirmResult.errors);
+
+        setState(() => _isLoading = true);
+      }
+
+      setState(() => _isLoading = false);
+
+      final msg = StringBuffer('[PDF] ');
+      msg.write('Nuevos: $totalImported');
+      if (totalUpdated > 0) msg.write(' | Actualizados: $totalUpdated');
+      if (allErrors.isNotEmpty) msg.write(' | Errores: ${allErrors.length}');
+
       setState(() {
         _resultMessage = msg.toString();
-        _isError = importResult.hasErrors && importResult.total == 0;
+        _isError = allErrors.isNotEmpty && (totalImported + totalUpdated) == 0;
+        _errorDetails = allErrors;
       });
     } catch (e) {
-      setState(() { _resultMessage = 'Error: $e'; _isError = true; });
+      setState(() {
+        _resultMessage = 'Error al importar PDF';
+        _isError = true;
+        _errorDetails = [e.toString()];
+      });
     } finally {
       setState(() => _isLoading = false);
     }
   }
+
+  // ── Import XML ──
+  Future<void> _importXml() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        allowMultiple: true,
+        withData: true,
+        dialogTitle: 'Seleccionar facturas XML',
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final contents = <String>[];
+      final names = <String>[];
+      for (final file in result.files) {
+        if (!file.name.toLowerCase().endsWith('.xml')) continue;
+        String? content;
+        if (file.bytes != null && file.bytes!.isNotEmpty) {
+          content = utf8.decode(file.bytes!, allowMalformed: true);
+        } else if (file.path != null) {
+          try { content = await File(file.path!).readAsString(); } catch (_) {}
+        }
+        if (content != null && content.trim().isNotEmpty) {
+          contents.add(content);
+          names.add(file.name);
+        }
+      }
+
+      if (contents.isEmpty) {
+        setState(() {
+          _resultMessage = 'No se seleccionaron archivos XML válidos (.xml)';
+          _isError = true;
+        });
+        return;
+      }
+
+      setState(() { _isLoading = true; _resultMessage = null; _errorDetails = []; });
+
+      // Use preview service for each XML
+      final previewService = XmlInvoicePreviewService(widget.db);
+      var totalImported = 0;
+      var totalUpdated = 0;
+      final allErrors = <String>[];
+
+      for (var i = 0; i < contents.length; i++) {
+        final preview = await previewService.parseXml(contents[i], fileName: names[i]);
+
+        setState(() => _isLoading = false);
+
+        // Show preview dialog
+        if (!mounted) return;
+        final confirmResult = await XmlInvoicePreviewDialog.show(
+          context,
+          preview: preview,
+          service: previewService,
+        );
+
+        if (confirmResult == null) {
+          // User cancelled this file
+          if (contents.length == 1) {
+            setState(() { _resultMessage = 'Importación cancelada'; _isError = false; });
+            return;
+          }
+          continue;
+        }
+
+        totalImported += confirmResult.imported;
+        totalUpdated += confirmResult.updated;
+        allErrors.addAll(confirmResult.errors);
+
+        setState(() => _isLoading = true);
+      }
+
+      setState(() => _isLoading = false);
+
+      // Show final result
+      final msg = StringBuffer('[XML] ');
+      msg.write('Nuevos: $totalImported');
+      if (totalUpdated > 0) msg.write(' | Actualizados: $totalUpdated');
+      if (allErrors.isNotEmpty) msg.write(' | Errores: ${allErrors.length}');
+
+      setState(() {
+        _resultMessage = msg.toString();
+        _isError = allErrors.isNotEmpty && (totalImported + totalUpdated) == 0;
+        _errorDetails = allErrors;
+      });
+    } catch (e) {
+      setState(() {
+        _resultMessage = 'Error al importar XML';
+        _isError = true;
+        _errorDetails = [e.toString()];
+      });
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
 }

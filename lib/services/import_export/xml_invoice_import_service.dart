@@ -26,12 +26,15 @@ class XmlInvoiceImportService {
 
     try {
       final document = XmlDocument.parse(xmlContent);
-      final root = document.rootElement;
+      var root = document.rootElement;
 
-      // Try to extract CFDI invoice info
+      // SRI Ecuador: <autorizacion><comprobante><![CDATA[<factura>...]]></comprobante></autorizacion>
+      root = _unwrapSriAutorizacion(root) ?? root;
+
+      // Try to extract invoice info
       _extractInvoiceInfo(root, invoiceInfo);
 
-      // Find product items (Conceptos/Concepto in CFDI)
+      // Find product items (Conceptos/Concepto in CFDI, Detalle in SRI, etc.)
       final items = _findConceptos(root);
 
       if (items.isEmpty) {
@@ -117,7 +120,7 @@ class XmlInvoiceImportService {
       }
     }
 
-    // Emisor (Supplier) info
+    // Emisor (Supplier) info — CFDI México
     final emisor = root.findAllElements('*').where((e) =>
         e.localName.toLowerCase() == 'emisor').firstOrNull;
     if (emisor != null) {
@@ -126,15 +129,80 @@ class XmlInvoiceImportService {
       if (nombre != null) info['Proveedor'] = nombre;
       if (rfc != null) info['RFC'] = rfc;
     }
+
+    // SRI Ecuador: infoTributaria + infoFactura
+    final infoTrib = _findChild(root, 'infoTributaria');
+    if (infoTrib != null) {
+      final razon = _getChildText(infoTrib, 'razonSocial');
+      final ruc = _getChildText(infoTrib, 'ruc');
+      final estab = _getChildText(infoTrib, 'estab');
+      final ptoEmi = _getChildText(infoTrib, 'ptoEmi');
+      final secuencial = _getChildText(infoTrib, 'secuencial');
+      if (razon != null) info['Proveedor'] = razon;
+      if (ruc != null) info['RUC'] = ruc;
+      if (estab != null && ptoEmi != null && secuencial != null) {
+        info['Factura'] = '$estab-$ptoEmi-$secuencial';
+      }
+    }
+    final infoFact = _findChild(root, 'infoFactura');
+    if (infoFact != null) {
+      final fecha = _getChildText(infoFact, 'fechaEmision');
+      final total = _getChildText(infoFact, 'importeTotal');
+      final comprador = _getChildText(infoFact, 'razonSocialComprador');
+      if (fecha != null) info['Fecha'] = fecha;
+      if (total != null) info['Total'] = '\$$total';
+      if (comprador != null) info['Comprador'] = comprador;
+    }
+  }
+
+  /// Unwrap SRI Ecuador authorized invoice XML
+  /// Structure: <autorizacion><comprobante><![CDATA[<factura>...</factura>]]></comprobante></autorizacion>
+  XmlElement? _unwrapSriAutorizacion(XmlElement root) {
+    if (root.localName.toLowerCase() != 'autorizacion') return null;
+
+    // Find <comprobante> element
+    final comprobante = _findChild(root, 'comprobante');
+    if (comprobante == null) return null;
+
+    // The CDATA content is the inner factura XML
+    final cdataContent = comprobante.innerText.trim();
+    if (cdataContent.isEmpty || !cdataContent.contains('<')) return null;
+
+    try {
+      final innerDoc = XmlDocument.parse(cdataContent);
+      return innerDoc.rootElement;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  XmlElement? _findChild(XmlElement parent, String name) {
+    for (final child in parent.childElements) {
+      if (child.localName.toLowerCase() == name.toLowerCase()) {
+        return child;
+      }
+    }
+    return null;
   }
 
   List<XmlElement> _findConceptos(XmlElement root) {
-    // Search for Concepto elements (CFDI standard)
+    // Search for product elements in various XML formats
     final results = <XmlElement>[];
+    final productTags = {
+      'concepto',    // CFDI México
+      'item',        // Generic
+      'product',     // Generic
+      'producto',    // Spanish generic
+      'detalle',     // Common in Latin American invoices
+      'linea',       // Some invoice formats
+      'articulo',    // Spanish
+      'det',         // SRI Ecuador
+      'invoiceline', // UBL format
+    };
 
     void searchRecursive(XmlElement element) {
       final localName = element.localName.toLowerCase();
-      if (localName == 'concepto' || localName == 'item' || localName == 'product') {
+      if (productTags.contains(localName)) {
         results.add(element);
       }
       for (final child in element.childElements) {
@@ -143,7 +211,40 @@ class XmlInvoiceImportService {
     }
 
     searchRecursive(root);
+
+    // If no known tags found, try heuristic: find elements with price-like attributes
+    if (results.isEmpty) {
+      _findByHeuristic(root, results);
+    }
+
     return results;
+  }
+
+  void _findByHeuristic(XmlElement root, List<XmlElement> results) {
+    // Look for any element with price/quantity attributes (common in invoices)
+    final priceAttrs = {'valorunitario', 'preciounitario', 'precio', 'unitprice', 'amount', 'importe', 'valor'};
+    final qtyAttrs = {'cantidad', 'quantity', 'qty', 'cant'};
+
+    void search(XmlElement element) {
+      final attrs = element.attributes.map((a) => a.localName.toLowerCase()).toSet();
+      final hasPrice = attrs.any((a) => priceAttrs.contains(a));
+      final hasQty = attrs.any((a) => qtyAttrs.contains(a));
+
+      // Also check child elements for price/quantity
+      final childNames = element.childElements.map((c) => c.localName.toLowerCase()).toSet();
+      final hasPriceChild = childNames.any((n) => priceAttrs.contains(n));
+      final hasQtyChild = childNames.any((n) => qtyAttrs.contains(n));
+
+      if ((hasPrice || hasPriceChild) && (hasQty || hasQtyChild)) {
+        results.add(element);
+      } else {
+        for (final child in element.childElements) {
+          search(child);
+        }
+      }
+    }
+
+    search(root);
   }
 
   Future<String> _processConcepto(
@@ -151,37 +252,53 @@ class XmlInvoiceImportService {
     int index,
     Map<String, String> categoryMap,
   ) async {
-    // Extract data from CFDI Concepto attributes
-    final description = item.getAttribute('Descripcion') ??
-        item.getAttribute('descripcion') ??
-        item.getAttribute('Description') ??
-        _getChildText(item, 'Descripcion') ??
-        _getChildText(item, 'Description') ??
+    // Helper to get attribute or child element text (case-insensitive)
+    String? _get(XmlElement el, List<String> names) {
+      for (final name in names) {
+        final attr = el.getAttribute(name) ?? el.getAttribute(name.toLowerCase());
+        if (attr != null && attr.trim().isNotEmpty) return attr.trim();
+        final child = _getChildText(el, name);
+        if (child != null && child.isNotEmpty) return child;
+      }
+      return null;
+    }
+
+    double _getNum(XmlElement el, List<String> names) {
+      final val = _get(el, names);
+      if (val == null) return 0;
+      return double.tryParse(val.replaceAll(',', '.').replaceAll('\$', '').trim()) ?? 0;
+    }
+
+    // Extract data flexibly from attributes OR child elements
+    final description = _get(item, ['Descripcion', 'Description', 'Nombre', 'Name', 'Producto', 'nombre', 'descripcion', 'codigoAuxiliar']) ??
         'Producto XML ${index + 1}';
 
-    final claveProdServ = item.getAttribute('ClaveProdServ') ??
-        item.getAttribute('claveprodserv');
+    final claveUnidad = _get(item, ['ClaveUnidad', 'claveunidad']);
 
-    final claveUnidad = item.getAttribute('ClaveUnidad') ??
-        item.getAttribute('claveunidad');
+    final noIdentificacion = _get(item, ['NoIdentificacion', 'Codigo', 'codigo', 'CodigoPrincipal', 'codigoPrincipal', 'Code', 'SKU', 'Barcode', 'codigoBarras']);
 
-    final noIdentificacion = item.getAttribute('NoIdentificacion') ??
-        item.getAttribute('noidentificacion') ??
-        item.getAttribute('Codigo') ??
-        _getChildText(item, 'NoIdentificacion') ??
-        _getChildText(item, 'Codigo');
+    final cantidad = _getNum(item, ['Cantidad', 'cantidad', 'Quantity', 'qty', 'Cant']);
 
-    final cantidad = double.tryParse(
-        item.getAttribute('Cantidad') ?? item.getAttribute('cantidad') ?? '0') ?? 0;
+    final valorUnitario = _getNum(item, ['ValorUnitario', 'PrecioUnitario', 'precioUnitario', 'Precio', 'precio', 'UnitPrice', 'precioSinSubsidio']);
 
-    final valorUnitario = double.tryParse(
-        item.getAttribute('ValorUnitario') ?? item.getAttribute('valorunitario') ?? '0') ?? 0;
+    final importe = _getNum(item, ['Importe', 'importe', 'Amount', 'PrecioTotalSinImpuesto', 'precioTotalSinImpuesto', 'Total', 'total']);
 
-    final importe = double.tryParse(
-        item.getAttribute('Importe') ?? item.getAttribute('importe') ?? '0') ?? 0;
+    final descuento = _getNum(item, ['Descuento', 'descuento', 'Discount', 'discount']);
 
-    final unidad = item.getAttribute('Unidad') ??
-        item.getAttribute('unidad') ??
+    // If no unit price but have importe and cantidad, calculate it
+    // For SRI Ecuador: use precioUnitario directly, taking discount into account
+    double finalUnitPrice;
+    if (valorUnitario > 0) {
+      // If there's a per-unit discount, subtract it
+      final perUnitDiscount = cantidad > 0 && descuento > 0 ? descuento / cantidad : 0.0;
+      finalUnitPrice = valorUnitario - perUnitDiscount;
+    } else if (cantidad > 0 && importe > 0) {
+      finalUnitPrice = importe / cantidad;
+    } else {
+      finalUnitPrice = 0.0;
+    }
+
+    final unidad = _get(item, ['Unidad', 'unidad', 'Unit']) ??
         _mapClaveUnidad(claveUnidad);
 
     // Check if product exists by code
@@ -194,7 +311,7 @@ class XmlInvoiceImportService {
       // Update existing: update cost price and add stock
       await (_db.update(_db.products)..where((p) => p.id.equals(existing!.id))).write(
         ProductsCompanion(
-          costPrice: Value(valorUnitario),
+          costPrice: Value(finalUnitPrice),
           currentStock: Value(existing.currentStock + cantidad),
           updatedAt: Value(DateTime.now()),
           syncStatus: const Value('pending'),
@@ -206,13 +323,13 @@ class XmlInvoiceImportService {
       final id = 'prod_xml_${DateTime.now().millisecondsSinceEpoch}_$index';
 
       // Calculate a default sale price (30% margin)
-      final salePrice = valorUnitario > 0 ? valorUnitario * 1.30 : 0.0;
+      final salePrice = finalUnitPrice > 0 ? finalUnitPrice * 1.30 : 0.0;
 
       await _db.productsDao.insertProduct(ProductsCompanion.insert(
         id: id,
         name: description,
         barcode: Value(noIdentificacion),
-        costPrice: Value(valorUnitario),
+        costPrice: Value(finalUnitPrice),
         salePrice: Value(salePrice),
         currentStock: Value(cantidad),
         unit: Value(unidad),

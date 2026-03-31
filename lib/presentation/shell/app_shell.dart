@@ -238,7 +238,9 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     // POS full screen
     if (currentRoute == '/') {
-      return Scaffold(body: widget.child);
+      return Scaffold(
+        body: widget.child,
+      );
     }
 
     // /home shows the module grid, all other routes show their content
@@ -246,15 +248,19 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      body: Column(
+      body: Stack(
         children: [
-          _buildTopNav(context, currentUser, currentRoute),
-          if (!isHome)
-            _buildBreadcrumb(context, currentRoute),
-          Expanded(
-            child: isHome
-                ? _buildHomeContent(context, currentUser)
-                : widget.child,
+          Column(
+            children: [
+              _buildTopNav(context, currentUser, currentRoute),
+              if (!isHome)
+                _buildBreadcrumb(context, currentRoute),
+              Expanded(
+                child: isHome
+                    ? _buildHomeContent(context, currentUser)
+                    : widget.child,
+              ),
+            ],
           ),
         ],
       ),
